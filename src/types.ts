@@ -12,6 +12,7 @@ export type View =
   | "obra"
   | "perfil"
   | "chamados"
+  | "relatorio"
   | "financeiro"
   | "projetos"
   | "documentos"

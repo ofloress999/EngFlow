@@ -7,6 +7,7 @@ const viewPermissions: Record<View, Role[]> = {
   obra: ["admin", "engenheiro", "arquiteto", "pedreiro", "cliente"],
   perfil: ["admin", "engenheiro", "arquiteto", "pedreiro", "cliente"],
   chamados: ["admin", "engenheiro", "arquiteto", "pedreiro", "cliente"],
+  relatorio: ["admin", "engenheiro", "arquiteto", "pedreiro", "cliente"],
   financeiro: ["admin", "engenheiro", "arquiteto", "cliente"],
   projetos: ["admin", "engenheiro", "arquiteto", "cliente"],
   documentos: ["admin", "engenheiro", "arquiteto"],

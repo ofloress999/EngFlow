@@ -11,6 +11,12 @@ type ProjectAiReportViewProps = {
   project: Project;
 };
 
+type ReportData = {
+  dailyLogs: DailyLog[];
+  updates: WorkUpdate[];
+  tickets: Ticket[];
+};
+
 export function ProjectAiReportView({ actorUserId, project }: ProjectAiReportViewProps) {
   const [dailyLogs, setDailyLogs] = useState<DailyLog[]>([]);
   const [updates, setUpdates] = useState<WorkUpdate[]>([]);
@@ -38,16 +44,20 @@ export function ProjectAiReportView({ actorUserId, project }: ProjectAiReportVie
   const totalWorkers = dailyLogs.reduce((sum, log) => sum + Number(log.workerCount ?? 0), 0);
   const pendingTickets = tickets.filter((ticket) => !/RESOLVIDO|CANCELADO/i.test(ticket.status)).length;
 
-  async function load() {
+  async function load(): Promise<ReportData> {
     const [logsResult, updatesResult, ticketsResult] = await Promise.allSettled([
       engflowApi.listDailyLogs(project.id, actorUserId),
       engflowApi.listUpdates(project.id, actorUserId),
       engflowApi.listTickets(project.id, actorUserId),
     ]);
 
-    if (logsResult.status === "fulfilled") setDailyLogs(logsResult.value);
-    if (updatesResult.status === "fulfilled") setUpdates(updatesResult.value);
-    if (ticketsResult.status === "fulfilled") setTickets(ticketsResult.value);
+    const nextDailyLogs = logsResult.status === "fulfilled" ? logsResult.value : dailyLogs;
+    const nextUpdates = updatesResult.status === "fulfilled" ? updatesResult.value : updates;
+    const nextTickets = ticketsResult.status === "fulfilled" ? ticketsResult.value : tickets;
+
+    setDailyLogs(nextDailyLogs);
+    setUpdates(nextUpdates);
+    setTickets(nextTickets);
 
     setLastSync(new Date().toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" }));
 
@@ -69,10 +79,11 @@ export function ProjectAiReportView({ actorUserId, project }: ProjectAiReportVie
       setMessage(
         `${getApiErrorMessage(firstError, "Alguns dados nao foram carregados.")} Fonte com falha: ${failedSources.join(", ")}. O relatorio sera gerado com os dados disponiveis.`,
       );
-      return;
+      return { dailyLogs: nextDailyLogs, updates: nextUpdates, tickets: nextTickets };
     }
 
     setMessage(null);
+    return { dailyLogs: nextDailyLogs, updates: nextUpdates, tickets: nextTickets };
   }
 
   useEffect(() => {
@@ -99,14 +110,15 @@ export function ProjectAiReportView({ actorUserId, project }: ProjectAiReportVie
 
   async function generateAiReport() {
     setIsGenerating(true);
-    const base = buildLocalReport(project, dailyLogs, updates, tickets);
+    const latest = await load();
+    const base = buildLocalReport(project, latest.dailyLogs, latest.updates, latest.tickets);
     try {
       const response = await engflowApi.askEngineeringAssistant({
         provider: "openai",
         projectName: project.name,
         projectStatus: project.status,
         projectProgress: project.progress,
-        fileCount: updates.length + dailyLogs.length,
+        fileCount: latest.updates.length + latest.dailyLogs.length,
         prompt: [
           "Pedido do usuario:",
           prompt,
@@ -115,8 +127,10 @@ export function ProjectAiReportView({ actorUserId, project }: ProjectAiReportVie
         ].join("\n\n"),
       });
       setAiReport(response.answer);
-    } catch {
+      setMessage(response.fallback ? "IA real indisponivel no servidor. Relatorio gerado com modo local usando os dados atuais da obra." : null);
+    } catch (error) {
       setAiReport(base);
+      setMessage(`${getApiErrorMessage(error, "A IA nao respondeu agora.")} Mostrei um relatorio local com os dados atuais da obra.`);
     } finally {
       setIsGenerating(false);
     }

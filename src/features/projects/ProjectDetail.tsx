@@ -270,7 +270,7 @@ export function ProjectDetail({
           </select>
         </label>
 
-        <div className="mt-6 hidden gap-2 overflow-x-auto pb-1 scrollbar-soft lg:flex">
+        <div className="mt-6 hidden flex-wrap gap-2 lg:flex">
           {tabs.map((tab) => {
             const Icon = tab.icon;
             return (

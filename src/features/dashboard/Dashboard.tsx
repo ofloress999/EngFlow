@@ -104,6 +104,7 @@ export function Dashboard({
   const projectTabByView: Partial<Record<View, ProjectTab>> = {
     financeiro: "financeiro",
     projetos: "projetos",
+    relatorio: "relatorio",
   };
   const roleTone = user.role === "arquiteto" ? "Compatibilizacao e projetos" : roleLabels[user.role];
 
@@ -299,7 +300,7 @@ export function Dashboard({
               <ProfileView user={user} onUserUpdate={onUserUpdate} onToast={onToast} />
             )}
             {view === "obra" && renderProjectDetail()}
-            {(view === "financeiro" || view === "projetos") && renderProjectDetail(projectTabByView[view])}
+            {(view === "financeiro" || view === "projetos" || view === "relatorio") && renderProjectDetail(projectTabByView[view])}
             {view === "chamados" && (
               <TicketsView
                 actorUserId={user.id}
@@ -368,6 +369,7 @@ function buildMenu(role: User["role"]): MenuItem[] {
       ...base,
       { id: "obras", label: "Obras", icon: Home },
       { id: "atualizacoes", label: "Atualizacoes", icon: ClipboardList },
+      { id: "relatorio", label: "Relatorio IA", icon: Files },
       { id: "chamados", label: "Chamados", icon: MessageSquare },
       { id: "insumos", label: "Insumos", icon: PackageMinus },
     ]);
@@ -379,6 +381,7 @@ function buildMenu(role: User["role"]): MenuItem[] {
       { id: "obras", label: "Minhas Obras", icon: Home },
       { id: "financeiro", label: "Financeiro", icon: Calculator },
       { id: "atualizacoes", label: "Atualizacoes", icon: ClipboardList },
+      { id: "relatorio", label: "Relatorio IA", icon: Files },
       { id: "projetos", label: "Projetos", icon: FolderKanban },
       { id: "chamados", label: "Chamados", icon: MessageSquare },
     ]);
@@ -388,6 +391,7 @@ function buildMenu(role: User["role"]): MenuItem[] {
     ...managerBase,
     { id: "obras", label: "Gerenciar Obras", icon: Home },
     { id: "nova-obra", label: "Criar Obra", icon: Plus },
+    { id: "relatorio", label: "Relatorio IA", icon: Files },
     { id: "chamados", label: "Chamados", icon: MessageSquare },
     { id: "precificacao", label: "Precificacao", icon: Calculator },
     { id: "planilhas", label: "Planilhas", icon: FileSpreadsheet },
