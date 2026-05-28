@@ -171,6 +171,42 @@ export default function App() {
     }
   }
 
+  async function handleCompleteProject(project: Project) {
+    if (!currentUser) return;
+    const confirmed = window.confirm(`Concluir a obra "${project.name}" e mover para Arquivadas?`);
+    if (!confirmed) return;
+    setIsLoading(true);
+    setError(null);
+    try {
+      await engflowApi.completeProject(project.id, currentUser.id);
+      await refreshUserData(currentUser.id);
+      setView("arquivadas");
+      pushToast("success", "Obra concluida", "A obra foi movida para Arquivadas.");
+    } catch (apiError) {
+      setError(getApiErrorMessage(apiError, "Nao foi possivel concluir a obra."));
+    } finally {
+      setIsLoading(false);
+    }
+  }
+
+  async function handleDeleteProject(project: Project) {
+    if (!currentUser) return;
+    const confirmed = window.confirm(`Excluir definitivamente a obra "${project.name}"? Esta acao remove historico, documentos e chamados vinculados.`);
+    if (!confirmed) return;
+    setIsLoading(true);
+    setError(null);
+    try {
+      await engflowApi.deleteProject(project.id, currentUser.id);
+      await refreshUserData(currentUser.id);
+      setSelectedProjectId((current) => (current === project.id ? null : current));
+      pushToast("success", "Obra excluida", "A obra foi removida do EngFlow.");
+    } catch (apiError) {
+      setError(getApiErrorMessage(apiError, "Nao foi possivel excluir a obra."));
+    } finally {
+      setIsLoading(false);
+    }
+  }
+
   async function handleAcceptInvitation(notification: AppNotification) {
     if (!currentUser || !notification.invitationId) return;
     setIsLoading(true);
@@ -293,6 +329,8 @@ export default function App() {
         onToast={pushToast}
         onLogout={handleLogout}
         onCreateProject={handleCreateProject}
+        onCompleteProject={handleCompleteProject}
+        onDeleteProject={handleDeleteProject}
         onRefreshProjects={() => refreshUserData(currentUser.id)}
         onRefreshNotifications={() => loadNotifications(currentUser.id)}
         onSelectView={handleSelectView}

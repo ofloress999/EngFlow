@@ -51,8 +51,8 @@ export function AuthScreen({
   const passwordHints = passwordIssues(register.password);
 
   return (
-    <main className="min-h-screen">
-      <div className="grid min-h-screen lg:grid-cols-[1.04fr_0.96fr]">
+    <main className="min-h-dvh lg:min-h-screen">
+      <div className="grid min-h-dvh lg:min-h-screen lg:grid-cols-[1.04fr_0.96fr]">
         <section className="auth-grid relative hidden min-h-[46vh] flex-col justify-between overflow-hidden px-6 py-7 text-white sm:px-10 lg:flex lg:min-h-screen lg:px-16">
           <div className="relative z-10 flex items-center justify-between gap-4">
             <div className="flex items-center gap-3">
@@ -110,8 +110,8 @@ export function AuthScreen({
           </div>
         </section>
 
-        <section className="flex min-h-screen items-center justify-center px-4 py-6 sm:px-10 lg:min-h-0 lg:py-10">
-          <div className="panel w-full max-w-md rounded-[2rem] p-6 sm:p-8">
+        <section className="flex min-h-dvh items-center justify-center px-4 py-5 sm:px-10 lg:min-h-0 lg:py-10">
+          <div className="panel w-full max-w-md rounded-[1.5rem] p-5 shadow-none sm:rounded-[2rem] sm:p-8 sm:shadow-[var(--shadow-soft)]">
             <div className="mb-8 flex items-start justify-between gap-4">
               <div>
                 <p className="badge-accent mb-4 inline-flex rounded-full px-3 py-1 text-xs font-black uppercase">

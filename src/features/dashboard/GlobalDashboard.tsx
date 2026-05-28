@@ -34,14 +34,14 @@ export function GlobalDashboard({ projects, notifications, canManage, onOpenProj
         <section className="panel rounded-[2rem] p-5">
           <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
             <div>
-              <h2 className="text-xl font-black">Documentos filtrados por obra</h2>
+              <h2 className="text-xl font-black">Documentacao filtrada por obra</h2>
               <p className="muted mt-1 text-sm">
                 Acesse projetos, contratos, relatorios e arquivos tecnicos de obras ativas ou concluidas.
               </p>
             </div>
             <button className="btn-primary flex items-center justify-center gap-2 px-4 py-3 font-bold" onClick={onOpenDocuments}>
               <FileArchive size={18} />
-              Abrir documentos
+              Abrir documentacao
             </button>
           </div>
         </section>

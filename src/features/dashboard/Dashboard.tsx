@@ -2,6 +2,7 @@ import {
   Building2,
   Calculator,
   ClipboardList,
+  Archive,
   Files,
   FileSpreadsheet,
   FolderKanban,
@@ -61,6 +62,8 @@ type DashboardProps = {
     startDate?: string;
     expectedEndDate?: string;
   }) => Promise<void>;
+  onCompleteProject: (project: Project) => Promise<void>;
+  onDeleteProject: (project: Project) => Promise<void>;
   onRefreshProjects: () => Promise<void>;
   onRefreshNotifications: () => Promise<void>;
   onSelectView: (view: View) => void;
@@ -91,6 +94,8 @@ export function Dashboard({
   onToast,
   onLogout,
   onCreateProject,
+  onCompleteProject,
+  onDeleteProject,
   onRefreshProjects,
   onRefreshNotifications,
   onSelectView,
@@ -106,6 +111,8 @@ export function Dashboard({
     projetos: "projetos",
     relatorio: "relatorio",
   };
+  const activeProjects = projects.filter((project) => project.status !== "Concluida");
+  const archivedProjects = projects.filter((project) => project.status === "Concluida");
   const roleTone = user.role === "arquiteto" ? "Compatibilizacao e projetos" : roleLabels[user.role];
 
   useEffect(() => {
@@ -130,13 +137,15 @@ export function Dashboard({
         initialTab={initialTab}
         onRefreshProjects={onRefreshProjects}
         onRefreshNotifications={onRefreshNotifications}
+        onCompleteProject={onCompleteProject}
+        onDeleteProject={onDeleteProject}
         onBack={() => onSelectView("obras")}
       />
     );
   }
 
   return (
-    <main className="min-h-screen">
+    <main className="min-h-dvh lg:min-h-screen">
       <aside className="fixed inset-x-0 top-0 z-50 border-b border-white/10 bg-[var(--sidebar)] px-4 py-3 text-white shadow-2xl shadow-black/10 lg:inset-y-0 lg:left-0 lg:right-auto lg:w-72 lg:border-b-0 lg:border-r lg:px-5 lg:py-6 lg:shadow-none">
         <div className="flex items-center justify-between gap-4 lg:block">
           <div className="flex items-center gap-3">
@@ -151,7 +160,7 @@ export function Dashboard({
             </div>
           </div>
           <button
-            className="icon-button flex h-11 w-11 items-center justify-center border-white/10 bg-white/10 text-white lg:hidden"
+            className="icon-button flex h-11 w-11 shrink-0 items-center justify-center border-white/10 bg-white/10 text-white lg:hidden"
             aria-label={mobileMenuOpen ? "Fechar menu" : "Abrir menu"}
             aria-expanded={mobileMenuOpen}
             onClick={() => setMobileMenuOpen((current) => !current)}
@@ -169,7 +178,7 @@ export function Dashboard({
         )}
 
         <nav
-          className={`fixed left-3 right-3 top-[5rem] z-50 grid max-h-[calc(100dvh-6rem)] gap-2 overflow-y-auto rounded-3xl border border-white/10 bg-[var(--sidebar)] p-3 shadow-2xl shadow-black/30 transition duration-200 scrollbar-soft lg:static lg:mt-9 lg:max-h-none lg:translate-y-0 lg:overflow-visible lg:rounded-none lg:border-0 lg:bg-transparent lg:p-0 lg:opacity-100 lg:shadow-none ${
+          className={`fixed left-3 right-3 top-[5rem] z-50 grid max-h-[calc(100dvh-6rem)] gap-2 overflow-y-auto rounded-3xl border border-white/10 bg-[var(--sidebar)] p-3 shadow-2xl shadow-black/30 transition duration-200 scrollbar-soft lg:static lg:mt-9 lg:max-h-[calc(100dvh-12rem)] lg:translate-y-0 lg:overflow-y-auto lg:rounded-none lg:border-0 lg:bg-transparent lg:p-0 lg:opacity-100 lg:shadow-none ${
             mobileMenuOpen
               ? "translate-y-0 opacity-100"
               : "pointer-events-none -translate-y-2 opacity-0 lg:pointer-events-auto"
@@ -263,7 +272,7 @@ export function Dashboard({
           </div>
         </header>
 
-        <div className="px-4 py-5 sm:px-8 sm:py-6">
+        <div className="px-3 py-4 sm:px-8 sm:py-6">
           {statusMessage && (
             <p className="mb-4 rounded-2xl border border-rose-500/20 bg-rose-500/10 p-3 text-sm font-bold text-rose-500">
               {statusMessage}
@@ -277,16 +286,29 @@ export function Dashboard({
                 notifications={notifications}
                 canManage={canManage}
                 onOpenProject={onSelectProject}
-                onOpenDocuments={() => onSelectView("documentos")}
+                onOpenDocuments={() => onSelectView("documentacao")}
               />
             )}
             {view === "obras" && (
               <ProjectsView
                 canManage={canManage}
                 isClient={isClient}
-                projects={projects}
+                projects={activeProjects}
                 onCreate={() => onSelectView("nova-obra")}
                 onOpen={onSelectProject}
+                onComplete={onCompleteProject}
+                onDelete={onDeleteProject}
+              />
+            )}
+            {view === "arquivadas" && canManage && (
+              <ProjectsView
+                canManage={canManage}
+                isClient={isClient}
+                projects={archivedProjects}
+                onCreate={() => onSelectView("nova-obra")}
+                onOpen={onSelectProject}
+                onDelete={onDeleteProject}
+                archived
               />
             )}
             {view === "nova-obra" && canManage && (
@@ -311,7 +333,7 @@ export function Dashboard({
                 onRefreshNotifications={onRefreshNotifications}
               />
             )}
-            {view === "documentos" && canManage && (
+            {view === "documentacao" && canManage && (
               <DocumentsView
                 actorUserId={user.id}
                 projects={projects}
@@ -361,7 +383,7 @@ function buildMenu(role: User["role"]): MenuItem[] {
     { id: "perfil", label: "Perfil", icon: UserCircle2 },
   ];
   const managerBase: MenuItem[] = isManagerRole(role)
-    ? [...base, { id: "documentos", label: "Documentos", icon: Files }]
+    ? [...base, { id: "documentacao", label: "Documentacao", icon: Files }]
     : base;
 
   if (role === "pedreiro") {
@@ -390,6 +412,7 @@ function buildMenu(role: User["role"]): MenuItem[] {
   return withPermissions(role, [
     ...managerBase,
     { id: "obras", label: "Gerenciar Obras", icon: Home },
+    { id: "arquivadas", label: "Arquivadas", icon: Archive },
     { id: "nova-obra", label: "Criar Obra", icon: Plus },
     { id: "relatorio", label: "Relatorio IA", icon: Files },
     { id: "chamados", label: "Chamados", icon: MessageSquare },

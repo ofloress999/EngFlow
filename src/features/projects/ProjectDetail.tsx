@@ -59,6 +59,8 @@ type ProjectDetailProps = {
   initialTab?: ProjectTab;
   onRefreshProjects: () => Promise<void>;
   onRefreshNotifications: () => Promise<void>;
+  onCompleteProject?: (project: Project) => Promise<void>;
+  onDeleteProject?: (project: Project) => Promise<void>;
   onBack: () => void;
 };
 
@@ -115,6 +117,8 @@ export function ProjectDetail({
   initialTab = "visao",
   onRefreshProjects,
   onRefreshNotifications,
+  onCompleteProject,
+  onDeleteProject,
   onBack,
 }: ProjectDetailProps) {
   const [activeTab, setActiveTab] = useState<ProjectTab>(initialTab);
@@ -243,10 +247,22 @@ export function ProjectDetail({
               Projetos 3D
             </button>
             {canManage && (
-              <button className="btn-primary flex items-center gap-2 px-4 py-3 font-bold" onClick={() => setShowInviteForm(true)}>
-                <UserPlus size={18} />
-                Adicionar colaborador
-              </button>
+              <>
+                {project.status !== "Concluida" && (
+                  <button className="btn-secondary flex items-center gap-2 px-4 py-3 font-bold" onClick={() => void onCompleteProject?.(project)}>
+                    <Save size={18} />
+                    Concluir obra
+                  </button>
+                )}
+                <button className="btn-secondary flex items-center gap-2 px-4 py-3 font-bold text-rose-600" onClick={() => void onDeleteProject?.(project)}>
+                  <X size={18} />
+                  Excluir obra
+                </button>
+                <button className="btn-primary flex items-center gap-2 px-4 py-3 font-bold" onClick={() => setShowInviteForm(true)}>
+                  <UserPlus size={18} />
+                  Adicionar colaborador
+                </button>
+              </>
             )}
             <button className="btn-secondary flex items-center gap-2 px-4 py-3 font-bold" onClick={onRefreshProjects}>
               <RotateCw size={18} />
@@ -445,6 +461,18 @@ function OverviewTab({
     expectedEndDate: project.deadline === "Sem prazo" ? "" : project.deadline,
   });
   const [projectMessage, setProjectMessage] = useState<string | null>(null);
+  const today = new Date();
+  const startDate = project.start ? new Date(`${project.start}T00:00:00`) : null;
+  const endDate = project.deadline !== "Sem prazo" ? new Date(`${project.deadline}T00:00:00`) : null;
+  const totalDays = startDate && endDate ? Math.max(1, daysBetween(startDate, endDate)) : null;
+  const elapsedDays = startDate ? Math.max(0, daysBetween(startDate, today)) : null;
+  const remainingDays = endDate ? daysBetween(today, endDate) : null;
+  const expectedProgress = totalDays && elapsedDays !== null
+    ? Math.min(100, Math.max(0, Math.round((elapsedDays / totalDays) * 100)))
+    : null;
+  const scheduleDelta = expectedProgress === null ? null : project.progress - expectedProgress;
+  const phase = phaseForProgress(project.progress);
+  const spentRatio = project.charged > 0 ? Math.round((project.spent / project.charged) * 100) : null;
 
   useEffect(() => {
     setProjectForm({
@@ -504,12 +532,41 @@ function OverviewTab({
             <span className="badge-accent rounded-full px-3 py-1 text-sm font-black">{project.progress}%</span>
           </div>
           <ProgressBar value={project.progress} />
-          <div className="mt-6 grid gap-4 md:grid-cols-[1fr_0.72fr]">
-            <div className="surface-soft rounded-3xl p-4">
-              <div className="mini-chart">
-                {[34, 52, 46, 72, 64, 82, Math.max(16, project.progress)].map((height, index) => (
-                  <span key={index} style={{ height: `${height}%` }} />
-                ))}
+          <div className="mt-6 grid gap-4 lg:grid-cols-[1fr_0.78fr]">
+            <div className="surface-soft rounded-3xl p-4 sm:p-5">
+              <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                <div>
+                  <p className="muted text-sm font-black uppercase">Leitura operacional</p>
+                  <h4 className="mt-1 text-xl font-black">{phase.title}</h4>
+                  <p className="muted mt-1 text-sm leading-6">{phase.detail}</p>
+                </div>
+                <span className={`badge rounded-full px-3 py-1 text-xs font-black ${scheduleDelta !== null && scheduleDelta >= 0 ? "badge-accent" : ""}`}>
+                  {scheduleDelta === null
+                    ? "Sem linha de base"
+                    : scheduleDelta >= 0
+                      ? `${scheduleDelta}% adiantado`
+                      : `${Math.abs(scheduleDelta)}% atrasado`}
+                </span>
+              </div>
+
+              <div className="grid gap-3 sm:grid-cols-3">
+                <MiniInsight label="Execucao restante" value={`${Math.max(0, 100 - project.progress)}%`} />
+                <MiniInsight
+                  label="Prazo restante"
+                  value={remainingDays === null ? "Sem prazo" : remainingDays < 0 ? `${Math.abs(remainingDays)}d atraso` : `${remainingDays}d`}
+                />
+                <MiniInsight label="Custo/contrato" value={spentRatio === null ? "Sem valor" : `${spentRatio}%`} />
+              </div>
+
+              <div className="mt-5 grid gap-4">
+                <ProgressComparison label="Progresso atual" value={project.progress} tone="actual" />
+                {expectedProgress !== null && <ProgressComparison label="Progresso esperado pelo prazo" value={expectedProgress} tone="expected" />}
+                {spentRatio !== null && <ProgressComparison label="Consumo financeiro" value={Math.min(100, spentRatio)} tone="money" />}
+              </div>
+
+              <div className="mt-5 rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-4">
+                <p className="text-sm font-black">Proxima acao sugerida</p>
+                <p className="muted mt-1 text-sm leading-6">{nextActionForProject(project.progress, remainingDays, spentRatio)}</p>
               </div>
             </div>
             <div className="grid gap-3">
@@ -849,6 +906,58 @@ function FilePreview({ file, zoom }: { file: ProjectFile; zoom: number }) {
 
 function isRealtime3dFile(file: ProjectFile) {
   return /\.(fbx|obj|gltf|glb)$/i.test(file.name) || /\.(fbx|obj|gltf|glb)$/i.test(file.fileUrl);
+}
+
+function MiniInsight({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-3">
+      <p className="muted text-xs font-black uppercase">{label}</p>
+      <p className="mt-1 text-lg font-black">{value}</p>
+    </div>
+  );
+}
+
+function ProgressComparison({ label, value, tone }: { label: string; value: number; tone: "actual" | "expected" | "money" }) {
+  const color =
+    tone === "actual"
+      ? "linear-gradient(90deg, var(--accent), var(--violet))"
+      : tone === "money"
+        ? "linear-gradient(90deg, var(--amber), var(--rose))"
+        : "linear-gradient(90deg, var(--subtle), var(--muted))";
+
+  return (
+    <div>
+      <div className="mb-2 flex items-center justify-between gap-3 text-sm">
+        <span className="font-bold">{label}</span>
+        <span className="muted font-black">{value}%</span>
+      </div>
+      <div className="h-2 overflow-hidden rounded-full bg-[color-mix(in_srgb,var(--border)_70%,transparent)]">
+        <span className="block h-full rounded-full" style={{ width: `${Math.min(100, Math.max(0, value))}%`, background: color }} />
+      </div>
+    </div>
+  );
+}
+
+function daysBetween(start: Date, end: Date) {
+  const day = 1000 * 60 * 60 * 24;
+  return Math.ceil((end.getTime() - start.getTime()) / day);
+}
+
+function phaseForProgress(progress: number) {
+  if (progress >= 100) return { title: "Obra concluida", detail: "Concentre a rotina em entrega, aceite, documentacao final e arquivamento tecnico." };
+  if (progress >= 75) return { title: "Reta final", detail: "Priorize acabamentos, pendencias abertas, revisoes finais e checklist de entrega." };
+  if (progress >= 45) return { title: "Execucao principal", detail: "Acompanhe produtividade diaria, compras criticas, interferencias e custo acumulado." };
+  if (progress >= 15) return { title: "Mobilizacao e base", detail: "Valide equipes, fundacao, documentacao, suprimentos e liberacoes iniciais." };
+  return { title: "Planejamento inicial", detail: "Estruture cronograma, responsaveis, documentos obrigatorios e primeiras frentes de servico." };
+}
+
+function nextActionForProject(progress: number, remainingDays: number | null, spentRatio: number | null) {
+  if (remainingDays !== null && remainingDays < 0) return "Replanejar prazo, registrar justificativa e comunicar responsaveis e cliente.";
+  if (spentRatio !== null && spentRatio > progress + 20) return "Revisar custos lancados antes de liberar novas compras ou etapas.";
+  if (progress < 15) return "Criar checklist inicial e registrar diario de obra com equipe, clima e primeiras atividades.";
+  if (progress < 75) return "Atualizar diario, confirmar materiais da proxima etapa e verificar chamados tecnicos pendentes.";
+  if (progress < 100) return "Conferir pendencias finais, documentacao de entrega e fotos de conclusao.";
+  return "Manter o acervo documental organizado e mover a obra para Arquivadas.";
 }
 
 function FinanceTab({

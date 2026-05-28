@@ -299,6 +299,17 @@ export const engflowApi = {
     return toProject(data);
   },
 
+  async completeProject(projectId: string, actorUserId: string) {
+    const { data } = await http.patch<ApiProject>(`/projects/${projectId}/complete`, { actorUserId });
+    return toProject(data);
+  },
+
+  async deleteProject(projectId: string, actorUserId: string) {
+    await http.delete(`/projects/${projectId}`, {
+      data: { actorUserId },
+    });
+  },
+
   async updateProjectFinance(projectId: string, payload: {
     actorUserId: string;
     totalSpent: number;

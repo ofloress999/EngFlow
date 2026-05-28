@@ -1,4 +1,4 @@
-import { CalendarDays, ListFilter, Plus, Search } from "lucide-react";
+import { Archive, CalendarDays, CheckCircle2, ListFilter, Plus, Search, Trash2 } from "lucide-react";
 import { useMemo, useState } from "react";
 import { Metric, ProgressBar } from "../../components";
 import { projectStatuses } from "../../constants/labels";
@@ -11,9 +11,12 @@ type ProjectsViewProps = {
   projects: Project[];
   onCreate: () => void;
   onOpen: (id: string) => void;
+  onComplete?: (project: Project) => void;
+  onDelete?: (project: Project) => void;
+  archived?: boolean;
 };
 
-export function ProjectsView({ canManage, isClient, projects, onCreate, onOpen }: ProjectsViewProps) {
+export function ProjectsView({ canManage, isClient, projects, onCreate, onOpen, onComplete, onDelete, archived = false }: ProjectsViewProps) {
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState("Todos");
   const filtered = useMemo(
@@ -38,15 +41,17 @@ export function ProjectsView({ canManage, isClient, projects, onCreate, onOpen }
               {isClient ? "Acompanhamento" : "Operacao"}
             </p>
             <h2 className="text-3xl font-black tracking-tight">
-              {isClient ? "Minhas Obras" : canManage ? "Gerenciar Obras" : "Obras"}
+              {archived ? "Obras arquivadas" : isClient ? "Minhas Obras" : canManage ? "Gerenciar Obras" : "Obras"}
             </h2>
             <p className="muted mt-2 max-w-2xl">
-              {isClient
+              {archived
+                ? "Consulte obras concluidas sem perder historico, documentos, relatorios e projetos."
+                : isClient
                 ? "Acompanhe progresso, cronograma, projetos, financeiro e atualizacoes."
                 : "Filtre, compare e acesse rapidamente cada obra ativa no ecossistema."}
             </p>
           </div>
-          {canManage && (
+          {canManage && !archived && (
             <button className="btn-primary flex items-center justify-center gap-2 px-4 py-3 font-bold" onClick={onCreate}>
               <Plus size={18} />
               Criar nova obra
@@ -55,7 +60,7 @@ export function ProjectsView({ canManage, isClient, projects, onCreate, onOpen }
         </div>
 
         <div className="mt-6 grid gap-4 md:grid-cols-3">
-          <Metric label="Obras" value={`${projects.length}`} />
+          <Metric label={archived ? "Arquivadas" : "Obras"} value={`${projects.length}`} />
           <Metric label="Andamento medio" value={`${averageProgress}%`} />
           <Metric label="Investimento total" value={money(projects.reduce((total, project) => total + project.invested, 0))} />
         </div>
@@ -87,6 +92,7 @@ export function ProjectsView({ canManage, isClient, projects, onCreate, onOpen }
 
       {filtered.length === 0 && (
         <section className="panel rounded-[2rem] p-8 text-center">
+          {archived && <Archive className="subtle mx-auto mb-3" size={34} />}
           <h3 className="text-xl font-black">Nenhuma obra encontrada</h3>
           <p className="muted mt-2">Ajuste os filtros ou aceite um convite para visualizar uma obra.</p>
         </section>
@@ -94,35 +100,50 @@ export function ProjectsView({ canManage, isClient, projects, onCreate, onOpen }
 
       <div className="grid gap-4 xl:grid-cols-3">
         {filtered.map((project) => (
-          <button
+          <article
             key={project.id}
             className="panel group rounded-[2rem] p-5 text-left transition hover:-translate-y-1 hover:border-[var(--border-strong)]"
-            onClick={() => onOpen(project.id)}
           >
-            {project.photoUrl && (
-              <img className="mb-4 h-36 w-full rounded-2xl object-cover" src={project.photoUrl} alt={project.name} />
-            )}
-            <div className="mb-5 flex items-start justify-between gap-3">
-              <div className="min-w-0">
-                <h3 className="truncate text-xl font-black tracking-tight">{project.name}</h3>
-                <p className="muted mt-1 text-sm">{project.address}</p>
+            <button className="block w-full text-left" onClick={() => onOpen(project.id)}>
+              {project.photoUrl && (
+                <img className="mb-4 h-36 w-full rounded-2xl object-cover" src={project.photoUrl} alt={project.name} />
+              )}
+              <div className="mb-5 flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <h3 className="truncate text-xl font-black tracking-tight">{project.name}</h3>
+                  <p className="muted mt-1 text-sm">{project.address}</p>
+                </div>
+                <span className="badge-accent shrink-0 rounded-full px-3 py-1 text-xs font-black">
+                  {project.status}
+                </span>
               </div>
-              <span className="badge-accent shrink-0 rounded-full px-3 py-1 text-xs font-black">
-                {project.status}
-              </span>
-            </div>
-            <ProgressBar value={project.progress} />
-            <div className="mt-5 grid grid-cols-2 gap-3 text-sm">
-              <Metric label="Cliente" value={project.client ?? "Vinculado"} />
-              <Metric label="Gasto" value={money(project.spent)} />
-              <Metric label="Inicio" value={project.start ?? "Sem data"} />
-              <Metric label="Previsao" value={project.deadline} />
-            </div>
-            <div className="muted mt-5 flex items-center gap-2 text-sm font-bold">
-              <CalendarDays size={16} />
-              Abrir detalhes
-            </div>
-          </button>
+              <ProgressBar value={project.progress} />
+              <div className="mt-5 grid grid-cols-2 gap-3 text-sm">
+                <Metric label="Cliente" value={project.client ?? "Vinculado"} />
+                <Metric label="Gasto" value={money(project.spent)} />
+                <Metric label="Inicio" value={project.start ?? "Sem data"} />
+                <Metric label="Previsao" value={project.deadline} />
+              </div>
+              <div className="muted mt-5 flex items-center gap-2 text-sm font-bold">
+                <CalendarDays size={16} />
+                Abrir detalhes
+              </div>
+            </button>
+            {canManage && (
+              <div className="mt-4 flex flex-wrap gap-2 border-t border-[var(--border)] pt-4">
+                {!archived && project.status !== "Concluida" && (
+                  <button className="btn-secondary flex items-center gap-2 px-3 py-2 text-sm font-bold" type="button" onClick={() => onComplete?.(project)}>
+                    <CheckCircle2 size={16} />
+                    Concluir
+                  </button>
+                )}
+                <button className="btn-secondary flex items-center gap-2 px-3 py-2 text-sm font-bold text-rose-600" type="button" onClick={() => onDelete?.(project)}>
+                  <Trash2 size={16} />
+                  Excluir
+                </button>
+              </div>
+            )}
+          </article>
         ))}
       </div>
     </div>
