@@ -2,11 +2,13 @@ import {
   Building2,
   Calculator,
   ClipboardList,
+  Files,
   FileSpreadsheet,
   FolderKanban,
   Home,
   LayoutDashboard,
   LogOut,
+  Menu,
   MessageSquare,
   Moon,
   PackageMinus,
@@ -14,7 +16,9 @@ import {
   Sun,
   UserCircle2,
   CalendarCheck,
+  X,
 } from "lucide-react";
+import { useEffect, useState } from "react";
 import type { ThemeMode } from "../../App";
 import { NotificationBar } from "../../components";
 import { roleLabels } from "../../constants/labels";
@@ -30,6 +34,7 @@ import { SheetsView } from "../sheets/SheetsView";
 import { SuppliesView } from "../supplies/SuppliesView";
 import { UpdatesView } from "../updates/UpdatesView";
 import { InspectionsView } from "../inspections/InspectionsView";
+import { DocumentsView } from "../documents/DocumentsView";
 import type { AppNotification, Project, User, View } from "../../types";
 
 type DashboardProps = {
@@ -91,6 +96,7 @@ export function Dashboard({
   onSelectView,
   onSelectProject,
 }: DashboardProps) {
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const canManage = isManagerRole(user.role);
   const isWorker = user.role === "pedreiro";
   const isClient = user.role === "cliente";
@@ -100,6 +106,15 @@ export function Dashboard({
     projetos: "projetos",
   };
   const roleTone = user.role === "arquiteto" ? "Compatibilizacao e projetos" : roleLabels[user.role];
+
+  useEffect(() => {
+    setMobileMenuOpen(false);
+  }, [view]);
+
+  function handleMenuSelect(nextView: View) {
+    setMobileMenuOpen(false);
+    onSelectView(nextView);
+  }
 
   function renderProjectDetail(initialTab?: ProjectTab) {
     if (!selectedProject) return <EmptyProjectState />;
@@ -121,41 +136,73 @@ export function Dashboard({
 
   return (
     <main className="min-h-screen">
-      <aside className="fixed inset-x-0 top-0 z-40 border-b border-white/10 bg-[var(--sidebar)] px-4 py-3 text-white lg:inset-y-0 lg:left-0 lg:right-auto lg:w-72 lg:border-b-0 lg:border-r lg:px-5 lg:py-6">
+      <aside className="fixed inset-x-0 top-0 z-50 border-b border-white/10 bg-[var(--sidebar)] px-4 py-3 text-white shadow-2xl shadow-black/10 lg:inset-y-0 lg:left-0 lg:right-auto lg:w-72 lg:border-b-0 lg:border-r lg:px-5 lg:py-6 lg:shadow-none">
         <div className="flex items-center justify-between gap-4 lg:block">
           <div className="flex items-center gap-3">
-            <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-white text-slate-950">
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-white text-slate-950 sm:h-11 sm:w-11">
               <Building2 size={23} />
             </div>
-            <div>
-              <p className="text-xl font-black tracking-tight">EngFlow</p>
-              <p className="text-xs font-semibold uppercase tracking-[0.2em] text-teal-100">{roleTone}</p>
+            <div className="min-w-0">
+              <p className="text-lg font-black tracking-tight sm:text-xl">EngFlow</p>
+              <p className="max-w-[13rem] truncate text-[11px] font-semibold uppercase tracking-[0.16em] text-teal-100 sm:max-w-none sm:text-xs sm:tracking-[0.2em]">
+                {roleTone}
+              </p>
             </div>
           </div>
-          <button className="icon-button border-white/10 bg-white/10 p-2 text-white lg:hidden" onClick={onLogout}>
-            <LogOut size={17} />
+          <button
+            className="icon-button flex h-11 w-11 items-center justify-center border-white/10 bg-white/10 text-white lg:hidden"
+            aria-label={mobileMenuOpen ? "Fechar menu" : "Abrir menu"}
+            aria-expanded={mobileMenuOpen}
+            onClick={() => setMobileMenuOpen((current) => !current)}
+          >
+            {mobileMenuOpen ? <X size={21} /> : <Menu size={21} />}
           </button>
         </div>
 
-        <nav className="mt-4 flex gap-2 overflow-x-auto pb-1 scrollbar-soft lg:mt-9 lg:grid lg:overflow-visible lg:pb-0">
+        {mobileMenuOpen && (
+          <button
+            className="fixed inset-0 top-[4.5rem] z-40 bg-black/45 backdrop-blur-[2px] lg:hidden"
+            aria-label="Fechar menu"
+            onClick={() => setMobileMenuOpen(false)}
+          />
+        )}
+
+        <nav
+          className={`fixed left-3 right-3 top-[5rem] z-50 grid max-h-[calc(100dvh-6rem)] gap-2 overflow-y-auto rounded-3xl border border-white/10 bg-[var(--sidebar)] p-3 shadow-2xl shadow-black/30 transition duration-200 scrollbar-soft lg:static lg:mt-9 lg:max-h-none lg:translate-y-0 lg:overflow-visible lg:rounded-none lg:border-0 lg:bg-transparent lg:p-0 lg:opacity-100 lg:shadow-none ${
+            mobileMenuOpen
+              ? "translate-y-0 opacity-100"
+              : "pointer-events-none -translate-y-2 opacity-0 lg:pointer-events-auto"
+          }`}
+        >
           {menu.map((item) => {
             const Icon = item.icon;
             const active = view === item.id;
             return (
               <button
                 key={item.id}
-                className={`flex shrink-0 items-center gap-3 rounded-2xl px-4 py-3 text-left text-sm font-bold transition lg:w-full ${
+                className={`flex min-h-12 w-full items-center gap-3 rounded-2xl px-4 py-3 text-left text-sm font-bold transition ${
                   active
                     ? "bg-white text-slate-950 shadow-lg shadow-black/20"
                     : "text-slate-300 hover:bg-white/10 hover:text-white"
                 }`}
-                onClick={() => onSelectView(item.id)}
+                onClick={() => handleMenuSelect(item.id)}
               >
-                <Icon size={18} />
-                {item.label}
+                <Icon className="shrink-0" size={18} />
+                <span className="min-w-0 truncate">{item.label}</span>
               </button>
             );
           })}
+          <div className="mt-2 rounded-3xl border border-white/10 bg-white/[0.08] p-4 lg:hidden">
+            <p className="truncate text-sm font-black">{user.name}</p>
+            <p className="mt-1 truncate text-xs text-slate-300">{user.email}</p>
+          </div>
+          <button
+            className="flex min-h-12 w-full items-center justify-center gap-2 rounded-2xl border border-white/10 px-4 py-3 font-bold text-slate-200 transition hover:bg-white/10 lg:hidden"
+            onClick={onLogout}
+          >
+            <LogOut size={17} />
+            Sair
+          </button>
         </nav>
 
         <div className="absolute bottom-5 left-5 right-5 hidden lg:block">
@@ -173,19 +220,19 @@ export function Dashboard({
         </div>
       </aside>
 
-      <section className="min-w-0 pt-32 lg:pl-72 lg:pt-0">
-        <header className="sticky top-0 z-30 border-b border-[var(--border)] bg-[color-mix(in_srgb,var(--app-bg)_88%,transparent)] px-5 py-4 backdrop-blur-xl sm:px-8">
-          <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
-            <div>
+      <section className="min-w-0 pt-[4.5rem] lg:pl-72 lg:pt-0">
+        <header className="sticky top-[4.5rem] z-30 border-b border-[var(--border)] bg-[color-mix(in_srgb,var(--app-bg)_88%,transparent)] px-4 py-3 backdrop-blur-xl sm:px-8 sm:py-4 lg:top-0">
+          <div className="flex items-center justify-between gap-3 xl:items-center">
+            <div className="min-w-0">
               <p className="muted flex items-center gap-2 text-sm font-bold">
-                <LayoutDashboard size={17} />
-                Dashboard {roleLabels[user.role]}
+                <LayoutDashboard className="shrink-0" size={17} />
+                <span className="truncate">Dashboard {roleLabels[user.role]}</span>
               </p>
-              <h1 className="mt-1 text-2xl font-black tracking-tight sm:text-3xl">
+              <h1 className="mt-1 truncate text-xl font-black tracking-tight sm:text-3xl">
                 Ola, {firstName(user.name)}
               </h1>
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex shrink-0 items-center gap-2">
               <NotificationBar
                 notifications={notifications}
                 onAcceptInvitation={onAcceptInvitation}
@@ -215,7 +262,7 @@ export function Dashboard({
           </div>
         </header>
 
-        <div className="px-5 py-6 sm:px-8">
+        <div className="px-4 py-5 sm:px-8 sm:py-6">
           {statusMessage && (
             <p className="mb-4 rounded-2xl border border-rose-500/20 bg-rose-500/10 p-3 text-sm font-bold text-rose-500">
               {statusMessage}
@@ -227,7 +274,9 @@ export function Dashboard({
               <GlobalDashboard
                 projects={projects}
                 notifications={notifications}
+                canManage={canManage}
                 onOpenProject={onSelectProject}
+                onOpenDocuments={() => onSelectView("documentos")}
               />
             )}
             {view === "obras" && (
@@ -259,6 +308,12 @@ export function Dashboard({
                 canRespond={canManage}
                 canCreate={isWorker || isClient}
                 onRefreshNotifications={onRefreshNotifications}
+              />
+            )}
+            {view === "documentos" && canManage && (
+              <DocumentsView
+                actorUserId={user.id}
+                projects={projects}
               />
             )}
             {view === "precificacao" && canManage && (
@@ -304,6 +359,9 @@ function buildMenu(role: User["role"]): MenuItem[] {
     { id: "global", label: "Dashboard", icon: LayoutDashboard },
     { id: "perfil", label: "Perfil", icon: UserCircle2 },
   ];
+  const managerBase: MenuItem[] = isManagerRole(role)
+    ? [...base, { id: "documentos", label: "Documentos", icon: Files }]
+    : base;
 
   if (role === "pedreiro") {
     return withPermissions(role, [
@@ -327,7 +385,7 @@ function buildMenu(role: User["role"]): MenuItem[] {
   }
 
   return withPermissions(role, [
-    ...base,
+    ...managerBase,
     { id: "obras", label: "Gerenciar Obras", icon: Home },
     { id: "nova-obra", label: "Criar Obra", icon: Plus },
     { id: "chamados", label: "Chamados", icon: MessageSquare },

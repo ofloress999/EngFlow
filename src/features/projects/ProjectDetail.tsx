@@ -6,9 +6,11 @@ import {
   ListChecks,
   MapPinned,
   CalendarDays,
+  FileText,
   FileStack,
   FileUp,
   Gauge,
+  BrainCircuit,
   ImagePlus,
   Images,
   Maximize2,
@@ -26,7 +28,8 @@ import {
   X,
   ZoomIn,
 } from "lucide-react";
-import { ChangeEvent, FormEvent, useEffect, useMemo, useState } from "react";
+import { ChangeEvent, Component, FormEvent, lazy, Suspense, useEffect, useMemo, useState } from "react";
+import type { ReactNode } from "react";
 import { engflowApi, getApiErrorMessage } from "../../api/engflowApi";
 import { Field, ProgressBar, Stat } from "../../components";
 import { apiRoleLabels, projectStatuses } from "../../constants/labels";
@@ -39,11 +42,13 @@ import { ChecklistView } from "../checklist/ChecklistView";
 import { ProjectMapView } from "../map/ProjectMapView";
 import { BeforeAfterView } from "../evolution/BeforeAfterView";
 import { VideosView } from "../videos/VideosView";
+import { SmartEngineeringHub } from "./SmartEngineeringHub";
+import { ProjectAiReportView } from "./ProjectAiReportView";
 import type { Project, ProjectFile, ProjectMember, Role } from "../../types";
 import { fileToDataUrl } from "../../utils/files";
 import { formatCpf, isValidCpf, money } from "../../utils/format";
 
-export type ProjectTab = "visao" | "projetos" | "chat" | "chamados" | "checklist" | "atualizacoes" | "diario" | "financeiro" | "insumos" | "mapa" | "evolucao" | "videos";
+export type ProjectTab = "visao" | "relatorio" | "inteligencia" | "projetos" | "chat" | "chamados" | "checklist" | "atualizacoes" | "diario" | "financeiro" | "insumos" | "mapa" | "evolucao" | "videos";
 
 type ProjectDetailProps = {
   actorUserId: string;
@@ -59,6 +64,8 @@ type ProjectDetailProps = {
 
 const tabs: { id: ProjectTab; label: string; icon: typeof Gauge }[] = [
   { id: "visao", label: "Visao Geral", icon: Gauge },
+  { id: "relatorio", label: "Relatorio IA", icon: FileText },
+  { id: "inteligencia", label: "IA + BIM", icon: BrainCircuit },
   { id: "projetos", label: "Projetos", icon: FileStack },
   { id: "chat", label: "Chat", icon: MessageCircle },
   { id: "chamados", label: "Chamados Tecnicos", icon: Box },
@@ -94,6 +101,10 @@ const folderOptions = [
   { label: "Relatorios", value: "relatorios" },
   { label: "Diario de obra", value: "diario-obra" },
 ];
+
+const ThreeModelViewer = lazy(() =>
+  import("./ThreeModelViewer").then((module) => ({ default: module.ThreeModelViewer })),
+);
 
 export function ProjectDetail({
   actorUserId,
@@ -223,6 +234,14 @@ export function ProjectDetail({
             </div>
           </div>
           <div className="flex flex-wrap gap-3">
+            <button className="btn-primary flex items-center gap-2 px-4 py-3 font-bold" onClick={() => setActiveTab("relatorio")}>
+              <FileText size={18} />
+              Relatorio IA
+            </button>
+            <button className="btn-secondary flex items-center gap-2 px-4 py-3 font-bold" onClick={() => setActiveTab("projetos")}>
+              <FileStack size={18} />
+              Projetos 3D
+            </button>
             {canManage && (
               <button className="btn-primary flex items-center gap-2 px-4 py-3 font-bold" onClick={() => setShowInviteForm(true)}>
                 <UserPlus size={18} />
@@ -236,7 +255,22 @@ export function ProjectDetail({
           </div>
         </div>
 
-        <div className="mt-6 flex gap-2 overflow-x-auto pb-1 scrollbar-soft">
+        <label className="mt-6 block lg:hidden">
+          <span className="muted mb-2 block text-sm font-bold">Area da obra</span>
+          <select
+            className="input-shell rounded-2xl px-4 py-3 font-bold"
+            value={activeTab}
+            onChange={(event) => setActiveTab(event.target.value as ProjectTab)}
+          >
+            {tabs.map((tab) => (
+              <option key={tab.id} value={tab.id}>
+                {tab.label}
+              </option>
+            ))}
+          </select>
+        </label>
+
+        <div className="mt-6 hidden gap-2 overflow-x-auto pb-1 scrollbar-soft lg:flex">
           {tabs.map((tab) => {
             const Icon = tab.icon;
             return (
@@ -269,6 +303,21 @@ export function ProjectDetail({
           onInvite={handleInvite}
           actorUserId={actorUserId}
           onRefreshProjects={onRefreshProjects}
+        />
+      )}
+
+      {activeTab === "relatorio" && (
+        <ProjectAiReportView
+          actorUserId={actorUserId}
+          project={project}
+        />
+      )}
+
+      {activeTab === "inteligencia" && (
+        <SmartEngineeringHub
+          project={project}
+          files={files}
+          canManage={canManage}
         />
       )}
 
@@ -646,7 +695,7 @@ function ProjectsTab({
                 <input
                   className="sr-only"
                   type="file"
-                  accept=".dwg,.dxf,.ifc,.rvt,.rfa,.rte,.skp,.layout,.ls,.lsproj,.pln,.pla,.bimx,.lumion,.dae,.fbx,.obj,.3ds,.blend,.nwd,.nwc,.pdf,.zip,image/*"
+                  accept=".dwg,.dxf,.ifc,.rvt,.rfa,.rte,.skp,.layout,.ls,.lsproj,.pln,.pla,.bimx,.lumion,.dae,.fbx,.obj,.gltf,.glb,.3ds,.blend,.nwd,.nwc,.pdf,.zip,image/*"
                   onChange={onFileSelect}
                 />
               </label>
@@ -768,6 +817,16 @@ function FilePreview({ file, zoom }: { file: ProjectFile; zoom: number }) {
   const isPdf = /\.pdf$/i.test(file.fileUrl) || file.contentType === "application/pdf" || file.fileUrl.startsWith("data:application/pdf");
   const isEmbeddable = isImage || isPdf || file.fileUrl.startsWith("http");
 
+  if (isRealtime3dFile(file)) {
+    return (
+      <ModelViewerBoundary>
+        <Suspense fallback={<EmptyLine text="Carregando motor 3D em tempo real..." />}>
+          <ThreeModelViewer file={file} zoom={zoom} />
+        </Suspense>
+      </ModelViewerBoundary>
+    );
+  }
+
   if (isImage) {
     return <img className="max-h-[28rem] w-full object-contain transition-transform" style={{ transform: `scale(${zoom})` }} src={file.fileUrl} alt={file.name} />;
   }
@@ -786,6 +845,10 @@ function FilePreview({ file, zoom }: { file: ProjectFile; zoom: number }) {
       </a>
     </div>
   );
+}
+
+function isRealtime3dFile(file: ProjectFile) {
+  return /\.(fbx|obj|gltf|glb)$/i.test(file.name) || /\.(fbx|obj|gltf|glb)$/i.test(file.fileUrl);
 }
 
 function FinanceTab({
@@ -940,4 +1003,29 @@ function TimelineItem({ title, value }: { title: string; value: string }) {
 
 function EmptyLine({ text }: { text: string }) {
   return <p className="surface-soft rounded-2xl p-4 text-sm font-semibold text-[var(--muted)]">{text}</p>;
+}
+
+class ModelViewerBoundary extends Component<{ children: ReactNode }, { hasError: boolean }> {
+  state = { hasError: false };
+
+  static getDerivedStateFromError() {
+    return { hasError: true };
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="flex min-h-[28rem] w-full items-center justify-center p-5 text-center">
+          <div className="surface-soft rounded-3xl p-5">
+            <p className="font-black">Nao foi possivel abrir o modelo 3D.</p>
+            <p className="muted mt-2 max-w-md text-sm leading-6">
+              O arquivo pode depender de textura externa, estar corrompido ou usar uma versao de FBX nao suportada pelo navegador.
+            </p>
+          </div>
+        </div>
+      );
+    }
+
+    return this.props.children;
+  }
 }

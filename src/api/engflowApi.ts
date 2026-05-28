@@ -23,11 +23,11 @@ import type {
 } from "../types";
 
 const http = axios.create({
-  baseURL: import.meta.env.VITE_API_URL ?? "http://localhost:8080/api",
+  baseURL: import.meta.env.VITE_API_URL ?? "/api",
 });
 
 const authHttp = axios.create({
-  baseURL: import.meta.env.VITE_API_URL ?? "http://localhost:8080/api",
+  baseURL: import.meta.env.VITE_API_URL ?? "/api",
 });
 
 const SESSION_KEY = "engflow.session";
@@ -711,6 +711,23 @@ export const engflowApi = {
     const { data } = await http.post(`/invitations/${invitationId}/decline`, null, {
       params: { actorUserId },
     });
+    return data;
+  },
+
+  async askEngineeringAssistant(payload: {
+    prompt: string;
+    provider: "openai" | "gemini";
+    projectName: string;
+    projectStatus: string;
+    projectProgress: number;
+    fileCount: number;
+  }) {
+    const { data } = await http.post<{
+      provider: string;
+      model: string;
+      answer: string;
+      fallback: boolean;
+    }>("/ai/engineering-assistant", payload);
     return data;
   },
 };

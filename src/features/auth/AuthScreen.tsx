@@ -53,7 +53,7 @@ export function AuthScreen({
   return (
     <main className="min-h-screen">
       <div className="grid min-h-screen lg:grid-cols-[1.04fr_0.96fr]">
-        <section className="auth-grid relative flex min-h-[46vh] flex-col justify-between overflow-hidden px-6 py-7 text-white sm:px-10 lg:min-h-screen lg:px-16">
+        <section className="auth-grid relative hidden min-h-[46vh] flex-col justify-between overflow-hidden px-6 py-7 text-white sm:px-10 lg:flex lg:min-h-screen lg:px-16">
           <div className="relative z-10 flex items-center justify-between gap-4">
             <div className="flex items-center gap-3">
               <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-white text-slate-950 shadow-2xl shadow-teal-900/20">
@@ -110,7 +110,7 @@ export function AuthScreen({
           </div>
         </section>
 
-        <section className="flex items-center justify-center px-6 py-10 sm:px-10">
+        <section className="flex min-h-screen items-center justify-center px-4 py-6 sm:px-10 lg:min-h-0 lg:py-10">
           <div className="panel w-full max-w-md rounded-[2rem] p-6 sm:p-8">
             <div className="mb-8 flex items-start justify-between gap-4">
               <div>
@@ -124,7 +124,14 @@ export function AuthScreen({
                   {isLogin ? "Acesse sua dashboard por funcao." : "Escolha sua funcao para entrar no fluxo correto."}
                 </p>
               </div>
-              <div className="surface-soft hidden rounded-2xl p-3 sm:block">
+              <button
+                className="icon-button flex h-11 w-11 shrink-0 items-center justify-center lg:hidden"
+                aria-label={theme === "dark" ? "Ativar tema claro" : "Ativar tema escuro"}
+                onClick={onToggleTheme}
+              >
+                {theme === "dark" ? <Sun size={18} /> : <Moon size={18} />}
+              </button>
+              <div className="surface-soft hidden rounded-2xl p-3 lg:block">
                 <HardHat size={22} />
               </div>
             </div>

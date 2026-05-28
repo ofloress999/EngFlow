@@ -14,6 +14,7 @@ export type View =
   | "chamados"
   | "financeiro"
   | "projetos"
+  | "documentos"
   | "precificacao"
   | "planilhas"
   | "vistoria"

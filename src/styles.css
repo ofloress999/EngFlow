@@ -313,6 +313,53 @@ button:disabled {
   background-size: 28px 28px;
 }
 
+.bim-model-scene {
+  position: relative;
+  height: 13rem;
+  width: 14rem;
+  transform: perspective(760px) rotateX(58deg) rotateZ(-36deg);
+  transform-style: preserve-3d;
+  animation: bim-orbit 10s ease-in-out infinite alternate;
+}
+
+.bim-layer {
+  position: absolute;
+  inset: 0;
+  border: 2px solid color-mix(in srgb, var(--accent) 65%, white);
+  border-radius: 1rem;
+  background:
+    linear-gradient(90deg, rgba(255, 255, 255, 0.24) 0 2px, transparent 2px 38px),
+    linear-gradient(0deg, rgba(255, 255, 255, 0.22) 0 2px, transparent 2px 38px),
+    color-mix(in srgb, var(--accent) 22%, transparent);
+  background-size: 38px 38px;
+  box-shadow: 0 22px 50px rgba(15, 23, 42, 0.16);
+}
+
+.bim-layer-a {
+  transform: translateZ(0);
+}
+
+.bim-layer-b {
+  inset: 13% 9%;
+  border-color: color-mix(in srgb, var(--amber) 72%, white);
+  background-color: rgba(245, 158, 11, 0.16);
+  transform: translateZ(42px);
+}
+
+.bim-layer-c {
+  inset: 26% 17%;
+  border-color: color-mix(in srgb, var(--violet) 72%, white);
+  background-color: rgba(124, 58, 237, 0.16);
+  transform: translateZ(82px);
+}
+
+.bim-layer-d {
+  inset: 39% 24%;
+  border-color: color-mix(in srgb, var(--rose) 68%, white);
+  background-color: rgba(244, 63, 94, 0.14);
+  transform: translateZ(122px);
+}
+
 .fade-in {
   animation: fade-in 260ms ease both;
 }
@@ -371,6 +418,15 @@ button:disabled {
   to {
     opacity: 1;
     transform: translateY(0);
+  }
+}
+
+@keyframes bim-orbit {
+  from {
+    transform: perspective(760px) rotateX(58deg) rotateZ(-38deg);
+  }
+  to {
+    transform: perspective(760px) rotateX(61deg) rotateZ(-27deg);
   }
 }
 

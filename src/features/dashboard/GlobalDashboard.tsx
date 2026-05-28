@@ -1,4 +1,4 @@
-import { Activity, AlertCircle, CheckCircle2, Clock3, HardHat, WalletCards } from "lucide-react";
+import { Activity, AlertCircle, CheckCircle2, Clock3, FileArchive, HardHat, WalletCards } from "lucide-react";
 import { Metric, ProgressBar, Stat } from "../../components";
 import type { AppNotification, Project } from "../../types";
 import { money, relativeTime } from "../../utils/format";
@@ -6,10 +6,12 @@ import { money, relativeTime } from "../../utils/format";
 type GlobalDashboardProps = {
   projects: Project[];
   notifications: AppNotification[];
+  canManage: boolean;
   onOpenProject: (id: string) => void;
+  onOpenDocuments: () => void;
 };
 
-export function GlobalDashboard({ projects, notifications, onOpenProject }: GlobalDashboardProps) {
+export function GlobalDashboard({ projects, notifications, canManage, onOpenProject, onOpenDocuments }: GlobalDashboardProps) {
   const active = projects.filter((project) => project.status === "Em andamento").length;
   const done = projects.filter((project) => project.status === "Concluida").length;
   const spent = projects.reduce((total, project) => total + project.spent, 0);
@@ -27,6 +29,23 @@ export function GlobalDashboard({ projects, notifications, onOpenProject }: Glob
         <Stat title="Pendencias" value={`${unread}`} detail="notificacoes" />
         <Stat title="Progresso medio" value={`${progress}%`} detail="portfolio" />
       </section>
+
+      {canManage && (
+        <section className="panel rounded-[2rem] p-5">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <h2 className="text-xl font-black">Documentos filtrados por obra</h2>
+              <p className="muted mt-1 text-sm">
+                Acesse projetos, contratos, relatorios e arquivos tecnicos de obras ativas ou concluidas.
+              </p>
+            </div>
+            <button className="btn-primary flex items-center justify-center gap-2 px-4 py-3 font-bold" onClick={onOpenDocuments}>
+              <FileArchive size={18} />
+              Abrir documentos
+            </button>
+          </div>
+        </section>
+      )}
 
       <section className="grid gap-6 xl:grid-cols-[1fr_0.62fr]">
         <div className="panel rounded-[2rem] p-5">

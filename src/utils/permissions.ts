@@ -9,6 +9,7 @@ const viewPermissions: Record<View, Role[]> = {
   chamados: ["admin", "engenheiro", "arquiteto", "pedreiro", "cliente"],
   financeiro: ["admin", "engenheiro", "arquiteto", "cliente"],
   projetos: ["admin", "engenheiro", "arquiteto", "cliente"],
+  documentos: ["admin", "engenheiro", "arquiteto"],
   precificacao: ["admin", "engenheiro", "arquiteto"],
   planilhas: ["admin", "engenheiro", "arquiteto"],
   vistoria: ["admin", "engenheiro", "arquiteto"],
