@@ -61,6 +61,7 @@ export type ProjectFile = {
   fileUrl: string;
   contentType?: string;
   tags?: string;
+  labelColor?: string;
   folderPath?: string;
 };
 

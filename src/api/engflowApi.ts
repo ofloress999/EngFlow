@@ -353,6 +353,7 @@ export const engflowApi = {
     fileUrl: string;
     contentType?: string;
     tags?: string;
+    labelColor?: string;
     folderPath?: string;
   }) {
     const { data } = await http.post<ProjectFile>(`/projects/${projectId}/files`, payload);
