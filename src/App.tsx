@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import type { FormEvent } from "react";
-import { engflowApi, getApiErrorMessage } from "./api/engflowApi";
-import { CriticalErrorModal, ToastHost } from "./components";
+import { engflowApi, getApiErrorMessage, isNetworkError } from "./api/engflowApi";
+import { ToastHost } from "./components";
 import type { ToastMessage, ToastTone } from "./components";
 import { AuthScreen } from "./features/auth/AuthScreen";
 import { Dashboard } from "./features/dashboard/Dashboard";
@@ -19,7 +19,16 @@ export type RegisterForm = {
 
 export type ThemeMode = "light" | "dark";
 
+const defaultRoute: AppRoute = { view: "global", projectId: null };
+const THEME_KEY = "engflow.theme";
+
+type AppRoute = {
+  view: View;
+  projectId: string | null;
+};
+
 export default function App() {
+  const initialRoute = readRoute();
   const [authMode, setAuthMode] = useState<AuthMode>("login");
   const [currentUser, setCurrentUser] = useState<User | null>(() => engflowApi.getStoredUser());
   const [loginCpf, setLoginCpf] = useState("");
@@ -31,15 +40,15 @@ export default function App() {
     password: "",
     role: "engenheiro",
   });
-  const [view, setView] = useState<View>("global");
+  const [view, setView] = useState<View>(initialRoute.view);
   const [projects, setProjects] = useState<Project[]>([]);
-  const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
+  const [selectedProjectId, setSelectedProjectId] = useState<string | null>(initialRoute.projectId);
   const [notifications, setNotifications] = useState<AppNotification[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [criticalError, setCriticalError] = useState<string | null>(null);
+  const [serverOffline, setServerOffline] = useState(false);
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
-  const [theme, setTheme] = useState<ThemeMode>("light");
+  const [theme, setTheme] = useState<ThemeMode>(() => readStoredTheme());
 
   const selectedProject = useMemo(
     () =>
@@ -62,7 +71,8 @@ export default function App() {
   }
 
   async function loadNotifications(userId: string) {
-    setNotifications(await engflowApi.listNotifications(userId));
+    const loaded = await engflowApi.listNotifications(userId);
+    setNotifications(loaded.filter((notification) => !notification.read));
   }
 
   async function refreshUserData(userId: string) {
@@ -72,9 +82,29 @@ export default function App() {
   useEffect(() => {
     if (!currentUser) return;
     refreshUserData(currentUser.id).catch((apiError) => {
-      setCriticalError(getApiErrorMessage(apiError, "Nao foi possivel carregar seus dados."));
+      if (isNetworkError(apiError)) {
+        setServerOffline(true);
+        return;
+      }
+      setError(getApiErrorMessage(apiError, "Nao foi possivel carregar seus dados."));
     });
   }, [currentUser?.id]);
+
+  useEffect(() => {
+    if (!currentUser) return;
+    const onPopState = () => {
+      const route = readRoute();
+      setView(route.view);
+      setSelectedProjectId(route.projectId);
+    };
+    window.addEventListener("popstate", onPopState);
+    return () => window.removeEventListener("popstate", onPopState);
+  }, [currentUser?.id]);
+
+  useEffect(() => {
+    if (!currentUser) return;
+    writeRoute({ view, projectId: selectedProjectId }, true);
+  }, [currentUser?.id, view, selectedProjectId]);
 
   useEffect(() => {
     if (!currentUser) return;
@@ -83,6 +113,17 @@ export default function App() {
     }, 30000);
     return () => window.clearInterval(interval);
   }, [currentUser?.id]);
+
+  useEffect(() => {
+    if (!currentUser) return;
+    const onServerOffline = () => setServerOffline(true);
+    window.addEventListener("engflow:server-offline", onServerOffline);
+    return () => window.removeEventListener("engflow:server-offline", onServerOffline);
+  }, [currentUser?.id]);
+
+  useEffect(() => {
+    localStorage.setItem(THEME_KEY, theme);
+  }, [theme]);
 
   function pushToast(tone: ToastTone, title: string, message?: string) {
     const id = crypto.randomUUID();
@@ -104,6 +145,7 @@ export default function App() {
       setCurrentUser(user);
       await refreshUserData(user.id);
       setView("global");
+      setServerOffline(false);
       pushToast("success", "Login realizado", "Bem-vindo ao EngFlow.");
     } catch (apiError) {
       setError(apiError instanceof Error && apiError.message === "CPF invalido"
@@ -133,6 +175,7 @@ export default function App() {
       setCurrentUser(user);
       await refreshUserData(user.id);
       setView("global");
+      setServerOffline(false);
       pushToast("success", "Cadastro criado", "Sua conta esta pronta.");
     } catch (apiError) {
       setError(apiError instanceof Error && apiError.message === "CPF invalido"
@@ -257,9 +300,16 @@ export default function App() {
   async function handleMarkNotificationRead(notification: AppNotification) {
     if (!currentUser || notification.read) return;
     await engflowApi.markNotificationRead(notification.id, currentUser.id);
-    setNotifications((current) =>
-      current.map((item) => (item.id === notification.id ? { ...item, read: true } : item)),
-    );
+    setNotifications((current) => current.filter((item) => item.id !== notification.id));
+  }
+
+  async function handleClearNotifications() {
+    if (!currentUser) return;
+    const currentNotifications = [...notifications];
+    setNotifications([]);
+    await Promise.all(currentNotifications.map((notification) =>
+      engflowApi.markNotificationRead(notification.id, currentUser.id).catch(() => undefined),
+    ));
   }
 
   function handleSelectView(nextView: View) {
@@ -277,6 +327,11 @@ export default function App() {
     setSelectedProjectId(null);
     setNotifications([]);
     setView("global");
+    window.history.replaceState(null, "", "/");
+  }
+
+  function handleRetryServer() {
+    window.location.reload();
   }
 
   if (!currentUser) {
@@ -303,14 +358,17 @@ export default function App() {
     );
   }
 
+  if (serverOffline) {
+    return (
+      <div className={`app-root ${theme === "dark" ? "theme-dark" : ""}`}>
+        <ServerOfflineView onRetry={handleRetryServer} onLogout={() => void handleLogout()} />
+      </div>
+    );
+  }
+
   return (
     <div className={`app-root ${theme === "dark" ? "theme-dark" : ""}`}>
       <ToastHost toasts={toasts} onDismiss={(id) => setToasts((current) => current.filter((toast) => toast.id !== id))} />
-      <CriticalErrorModal
-        message={criticalError}
-        onClose={() => setCriticalError(null)}
-        onRetry={() => refreshUserData(currentUser.id)}
-      />
       <Dashboard
         user={currentUser}
         view={view}
@@ -325,6 +383,7 @@ export default function App() {
         onDeclineInvitation={handleDeclineInvitation}
         onOpenNotification={handleOpenNotification}
         onMarkNotificationRead={handleMarkNotificationRead}
+        onClearNotifications={handleClearNotifications}
         onUserUpdate={setCurrentUser}
         onToast={pushToast}
         onLogout={handleLogout}
@@ -341,4 +400,112 @@ export default function App() {
       />
     </div>
   );
+}
+
+function readRoute(): AppRoute {
+  const path = window.location.pathname.replace(/\/+$/, "") || "/";
+  const parts = path.split("/").filter(Boolean);
+  if (parts.length === 0 || parts[0] === "dashboard") return defaultRoute;
+  if (parts[0] === "obras") return { view: "obras", projectId: null };
+  if (parts[0] === "criar-obra") return { view: "nova-obra", projectId: null };
+  if (parts[0] === "obra" && parts[1]) {
+    const view = tabPathToView(parts[2]);
+    return { view, projectId: decodeURIComponent(parts[1]) };
+  }
+  const view = pathToView[parts[0]];
+  return view ? { view, projectId: null } : defaultRoute;
+}
+
+function writeRoute(route: AppRoute, replace = false) {
+  const path = routeToPath(route);
+  if (window.location.pathname === path) return;
+  const method = replace ? "replaceState" : "pushState";
+  window.history[method](null, "", path);
+}
+
+function routeToPath(route: AppRoute) {
+  if (route.projectId && ["obra", "financeiro", "projetos", "relatorio"].includes(route.view)) {
+    const suffix = route.view === "obra" ? "" : `/${viewToTabPath[route.view] ?? route.view}`;
+    return `/obra/${encodeURIComponent(route.projectId)}${suffix}`;
+  }
+  return viewToPath[route.view] ?? "/dashboard";
+}
+
+const pathToView: Record<string, View> = {
+  dashboard: "global",
+  perfil: "perfil",
+  chamados: "chamados",
+  relatorio: "relatorio",
+  financeiro: "financeiro",
+  projetos: "projetos",
+  documentacao: "documentacao",
+  arquivadas: "arquivadas",
+  precificacao: "precificacao",
+  planilhas: "planilhas",
+  vistoria: "vistoria",
+  insumos: "insumos",
+  atualizacoes: "atualizacoes",
+};
+
+const viewToPath: Record<View, string> = {
+  global: "/dashboard",
+  obras: "/obras",
+  "nova-obra": "/criar-obra",
+  obra: "/obra",
+  perfil: "/perfil",
+  chamados: "/chamados",
+  relatorio: "/relatorio",
+  financeiro: "/financeiro",
+  projetos: "/projetos",
+  documentacao: "/documentacao",
+  arquivadas: "/arquivadas",
+  precificacao: "/precificacao",
+  planilhas: "/planilhas",
+  vistoria: "/vistoria",
+  insumos: "/insumos",
+  atualizacoes: "/atualizacoes",
+};
+
+const viewToTabPath: Partial<Record<View, string>> = {
+  financeiro: "financeiro",
+  projetos: "projetos",
+  relatorio: "relatorio-ia",
+};
+
+function tabPathToView(tab?: string): View {
+  if (tab === "financeiro") return "financeiro";
+  if (tab === "projetos") return "projetos";
+  if (tab === "relatorio-ia" || tab === "relatorio") return "relatorio";
+  return "obra";
+}
+
+function ServerOfflineView({ onRetry, onLogout }: { onRetry: () => void; onLogout: () => void }) {
+  return (
+    <main className="flex min-h-dvh items-center justify-center p-5">
+      <section className="panel max-w-xl rounded-[2rem] p-6 text-center">
+        <p className="badge-accent mx-auto mb-4 w-fit rounded-full px-3 py-1 text-xs font-black uppercase">Conexao instavel</p>
+        <h1 className="text-3xl font-black tracking-tight">Nao foi possivel atualizar seus dados agora</h1>
+        <p className="muted mt-3 leading-7">
+          Suas informacoes estao preservadas. Aguarde alguns instantes e tente carregar a area novamente.
+        </p>
+        <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:justify-center">
+          <button className="btn-primary px-4 py-3 font-bold" type="button" onClick={onRetry}>
+            Carregar novamente
+          </button>
+          <button className="btn-secondary px-4 py-3 font-bold" type="button" onClick={onLogout}>
+            Sair da conta
+          </button>
+        </div>
+      </section>
+    </main>
+  );
+}
+
+function readStoredTheme(): ThemeMode {
+  try {
+    const stored = localStorage.getItem(THEME_KEY);
+    return stored === "dark" ? "dark" : "light";
+  } catch {
+    return "light";
+  }
 }

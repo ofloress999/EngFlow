@@ -46,12 +46,16 @@ type ApiErrorBody = {
 export function getApiErrorMessage(error: unknown, fallback = "Nao foi possivel concluir a acao.") {
   if (axios.isAxiosError<ApiErrorBody>(error)) {
     if (!error.response) {
-      return "Verifique sua conexao.";
+      return "Nao foi possivel atualizar as informacoes agora. Tente novamente em instantes.";
     }
     return error.response.data?.message ?? messageForStatus(error.response.status, fallback);
   }
 
   return fallback;
+}
+
+export function isNetworkError(error: unknown) {
+  return axios.isAxiosError(error) && !error.response;
 }
 
 function messageForStatus(status: number, fallback: string) {
@@ -61,7 +65,7 @@ function messageForStatus(status: number, fallback: string) {
   if (status === 404) return "Registro nao encontrado.";
   if (status === 409) return "Ja existe um registro com esses dados.";
   if (status === 429) return "Muitas tentativas. Aguarde alguns instantes.";
-  if (status >= 500) return "Servidor temporariamente indisponivel.";
+  if (status >= 500) return "Nao foi possivel concluir agora. Tente novamente em alguns instantes.";
   return fallback;
 }
 
@@ -201,6 +205,9 @@ http.interceptors.request.use((config) => {
 http.interceptors.response.use(
   (response) => response,
   async (error) => {
+    if (axios.isAxiosError(error) && !error.response) {
+      window.dispatchEvent(new CustomEvent("engflow:server-offline"));
+    }
     const session = readSession();
     const original = error.config as typeof error.config & { _retry?: boolean };
     if (axios.isAxiosError(error) && error.response?.status === 401 && session?.refreshToken && !original?._retry) {
@@ -213,6 +220,16 @@ http.interceptors.response.use(
         original.headers.Authorization = `Bearer ${accessToken}`;
         return http(original);
       }
+    }
+    return Promise.reject(error);
+  },
+);
+
+authHttp.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    if (axios.isAxiosError(error) && !error.response) {
+      window.dispatchEvent(new CustomEvent("engflow:server-offline"));
     }
     return Promise.reject(error);
   },
@@ -558,6 +575,13 @@ export const engflowApi = {
 
   async approveSupply(supplyId: string, actorUserId: string) {
     const { data } = await http.post<SupplyRequest>(`/supplies/${supplyId}/approve`, null, {
+      params: { actorUserId },
+    });
+    return data;
+  },
+
+  async declineSupply(supplyId: string, actorUserId: string) {
+    const { data } = await http.post<SupplyRequest>(`/supplies/${supplyId}/decline`, null, {
       params: { actorUserId },
     });
     return data;

@@ -1,6 +1,6 @@
 import { Bot, Download, FileText, RefreshCw, Send } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
-import { engflowApi, getApiErrorMessage } from "../../api/engflowApi";
+import { engflowApi } from "../../api/engflowApi";
 import { Stat } from "../../components";
 import type { DailyLog, Project, Ticket, WorkUpdate } from "../../types";
 import { money, relativeTime } from "../../utils/format";
@@ -68,17 +68,7 @@ export function ProjectAiReportView({ actorUserId, project }: ProjectAiReportVie
     ].filter(Boolean);
 
     if (failedSources.length > 0) {
-      const firstError =
-        logsResult.status === "rejected"
-          ? logsResult.reason
-          : updatesResult.status === "rejected"
-            ? updatesResult.reason
-            : ticketsResult.status === "rejected"
-              ? ticketsResult.reason
-              : null;
-      setMessage(
-        `${getApiErrorMessage(firstError, "Alguns dados nao foram carregados.")} Fonte com falha: ${failedSources.join(", ")}. O relatorio sera gerado com os dados disponiveis.`,
-      );
+      setMessage("Algumas informacoes ainda nao foram carregadas. O relatorio sera gerado com os dados disponiveis da obra.");
       return { dailyLogs: nextDailyLogs, updates: nextUpdates, tickets: nextTickets };
     }
 
@@ -113,24 +103,27 @@ export function ProjectAiReportView({ actorUserId, project }: ProjectAiReportVie
     const latest = await load();
     const base = buildLocalReport(project, latest.dailyLogs, latest.updates, latest.tickets);
     try {
-      const response = await engflowApi.askEngineeringAssistant({
-        provider: "openai",
-        projectName: project.name,
-        projectStatus: project.status,
-        projectProgress: project.progress,
-        fileCount: latest.updates.length + latest.dailyLogs.length,
-        prompt: [
-          "Pedido do usuario:",
-          prompt,
-          "Contexto real atualizado da obra para usar obrigatoriamente no relatorio:",
-          base,
-        ].join("\n\n"),
-      });
+      const response = await withTimeout(
+        engflowApi.askEngineeringAssistant({
+          provider: "openai",
+          projectName: project.name,
+          projectStatus: project.status,
+          projectProgress: project.progress,
+          fileCount: latest.updates.length + latest.dailyLogs.length,
+          prompt: [
+            "Pedido do usuario:",
+            prompt,
+            "Contexto real atualizado da obra para usar obrigatoriamente no relatorio:",
+            base,
+          ].join("\n\n"),
+        }),
+        18000,
+      );
       setAiReport(response.answer);
-      setMessage(response.fallback ? "IA real indisponivel no servidor. Relatorio gerado com modo local usando os dados atuais da obra." : null);
+      setMessage(response.fallback ? "Relatorio gerado com os dados atuais disponiveis. A analise pode ser refinada quando a IA externa responder." : null);
     } catch (error) {
       setAiReport(base);
-      setMessage(`${getApiErrorMessage(error, "A IA nao respondeu agora.")} Mostrei um relatorio local com os dados atuais da obra.`);
+      setMessage("A analise completa demorou mais que o esperado. Mostrei um relatorio com os dados atuais da obra para voce nao ficar travado.");
     } finally {
       setIsGenerating(false);
     }
@@ -293,4 +286,14 @@ function buildLocalReport(project: Project, dailyLogs: DailyLog[], updates: Work
 
 function formatDate(value: string) {
   return new Date(`${value}T00:00:00`).toLocaleDateString("pt-BR");
+}
+
+function withTimeout<T>(promise: Promise<T>, timeoutMs: number) {
+  return new Promise<T>((resolve, reject) => {
+    const timeout = window.setTimeout(() => reject(new Error("timeout")), timeoutMs);
+    promise
+      .then(resolve)
+      .catch(reject)
+      .finally(() => window.clearTimeout(timeout));
+  });
 }

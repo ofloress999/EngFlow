@@ -12,6 +12,9 @@ export default defineConfig({
       host: "127.0.0.1",
       clientPort: 5173,
     },
+    headers: {
+      "Cache-Control": "no-store",
+    },
     proxy: {
       "/api": {
         target: "http://localhost:8080",

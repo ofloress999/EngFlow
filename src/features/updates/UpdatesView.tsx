@@ -10,6 +10,7 @@ import {
   Search,
   Send,
   SlidersHorizontal,
+  Trash2,
   UploadCloud,
   Video,
 } from "lucide-react";
@@ -77,6 +78,7 @@ export function UpdatesView({
     progressPercent: "",
   });
   const [message, setMessage] = useState<string | null>(null);
+  const [isPublishing, setIsPublishing] = useState(false);
   const hasTodayUpdate = useMemo(
     () => updates.some((update) => update.createdAt && new Date(update.createdAt).toDateString() === new Date().toDateString()),
     [updates],
@@ -120,8 +122,13 @@ export function UpdatesView({
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!projectId) return;
+    if (!form.title.trim() || !form.description.trim()) {
+      setMessage("Informe titulo e descricao antes de publicar.");
+      return;
+    }
+    setIsPublishing(true);
     try {
-      await engflowApi.addUpdate(projectId, {
+      const created = await engflowApi.addUpdate(projectId, {
         actorUserId,
         title: form.title,
         description: form.description,
@@ -132,9 +139,12 @@ export function UpdatesView({
         progressPercent: form.progressPercent ? Number(form.progressPercent) : undefined,
       });
       setForm({ title: "", description: "", type: "OBRA", photoUrl: "", mediaUrl: "", mediaContentType: "", progressPercent: "" });
-      await load();
+      setUpdates((current) => uniqueById([created, ...current]));
+      setMessage(null);
     } catch (error) {
       setMessage(getApiErrorMessage(error, "Nao foi possivel registrar andamento."));
+    } finally {
+      setIsPublishing(false);
     }
   }
 
@@ -151,6 +161,10 @@ export function UpdatesView({
       mediaContentType: file.type,
       title: form.title || file.name,
     });
+  }
+
+  function removeSelectedMedia() {
+    setForm({ ...form, photoUrl: "", mediaUrl: "", mediaContentType: "" });
   }
 
   async function handleLike(updateId: string) {
@@ -243,8 +257,22 @@ export function UpdatesView({
               </span>
               <input className="sr-only" type="file" accept="image/*,video/*" onChange={handleMediaSelect} />
             </label>
-            {form.mediaUrl && <MediaPreview update={form} />}
-            <button className="btn-primary px-4 py-3 font-bold">Publicar na timeline</button>
+            {form.mediaUrl && (
+              <div className="overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--surface)]">
+                <MediaPreview update={form} />
+                <button
+                  className="flex w-full items-center justify-center gap-2 px-3 py-3 text-sm font-black text-rose-600"
+                  type="button"
+                  onClick={removeSelectedMedia}
+                >
+                  <Trash2 size={16} />
+                  Remover midia selecionada
+                </button>
+              </div>
+            )}
+            <button className="btn-primary px-4 py-3 font-bold disabled:opacity-60" disabled={isPublishing}>
+              {isPublishing ? "Publicando..." : "Publicar na timeline"}
+            </button>
           </form>
         )}
 
@@ -363,4 +391,8 @@ function MediaPreview({ update }: { update: Pick<WorkUpdate, "title" | "mediaUrl
 
 function dateTime(value?: string) {
   return value ? new Date(value).getTime() : 0;
+}
+
+function uniqueById(updates: WorkUpdate[]) {
+  return [...new Map(updates.map((update) => [update.id, update])).values()];
 }

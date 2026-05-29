@@ -15,7 +15,7 @@ const viewPermissions: Record<View, Role[]> = {
   precificacao: ["admin", "engenheiro", "arquiteto"],
   planilhas: ["admin", "engenheiro", "arquiteto"],
   vistoria: ["admin", "engenheiro", "arquiteto"],
-  insumos: ["admin", "pedreiro"],
+  insumos: ["admin", "pedreiro", "cliente"],
   atualizacoes: ["admin", "engenheiro", "arquiteto", "pedreiro", "cliente"],
 };
 

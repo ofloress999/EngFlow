@@ -113,7 +113,7 @@ export function GlobalDashboard({ projects, notifications, canManage, onOpenProj
             </div>
             <div className="mt-4 flex items-center gap-2 text-sm font-bold text-[var(--accent-strong)]">
               <WalletCards size={16} />
-              Dados consolidados em tempo real quando o backend estiver ativo.
+              Dados consolidados assim que houver novas atualizacoes da obra.
             </div>
           </section>
         </div>

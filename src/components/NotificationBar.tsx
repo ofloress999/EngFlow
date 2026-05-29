@@ -9,6 +9,7 @@ type NotificationBarProps = {
   onDeclineInvitation: (notification: AppNotification) => void;
   onOpenNotification: (notification: AppNotification) => void;
   onMarkRead: (notification: AppNotification) => Promise<void>;
+  onClear: () => Promise<void>;
   onRefresh: () => void;
 };
 
@@ -18,6 +19,7 @@ export function NotificationBar({
   onDeclineInvitation,
   onOpenNotification,
   onMarkRead,
+  onClear,
   onRefresh,
 }: NotificationBarProps) {
   const [isOpen, setIsOpen] = useState(false);
@@ -41,7 +43,7 @@ export function NotificationBar({
       </button>
 
       {isOpen && (
-        <div className="panel absolute right-0 top-14 z-40 w-[min(92vw,25rem)] rounded-2xl p-4">
+        <div className="panel fixed left-1/2 top-20 z-40 w-[min(92vw,25rem)] -translate-x-1/2 rounded-2xl p-4 sm:absolute sm:left-auto sm:right-0 sm:top-14 sm:translate-x-0">
           <div className="mb-4 flex items-center justify-between gap-3">
             <div>
               <h2 className="font-black">Notificacoes</h2>
@@ -52,7 +54,7 @@ export function NotificationBar({
                 <button
                   className="btn-secondary px-3 py-2 text-xs font-bold"
                   title="Limpar notificacoes"
-                  onClick={() => notifications.filter((notification) => !notification.read).forEach((notification) => void onMarkRead(notification))}
+                  onClick={() => void onClear()}
                 >
                   Limpar
                 </button>

@@ -19,6 +19,7 @@ export function ProjectChatView({ actorUserId, projectId }: ProjectChatViewProps
   const [replyToId, setReplyToId] = useState<string | undefined>();
   const [attachment, setAttachment] = useState<{ url: string; type: string; name: string } | null>(null);
   const [message, setMessage] = useState<string | null>(null);
+  const [isSending, setIsSending] = useState(false);
 
   const collaborators = members.filter((member) => member.userId !== actorUserId);
   const selectedRecipient = collaborators.find((member) => member.userId === selectedRecipientId);
@@ -38,7 +39,7 @@ export function ProjectChatView({ actorUserId, projectId }: ProjectChatViewProps
       setMessages([]);
       return;
     }
-    setMessages(await engflowApi.listChatMessages(projectId, actorUserId, targetChannel));
+    setMessages(uniqueMessages(await engflowApi.listChatMessages(projectId, actorUserId, targetChannel)));
   }
 
   useEffect(() => {
@@ -60,9 +61,10 @@ export function ProjectChatView({ actorUserId, projectId }: ProjectChatViewProps
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!projectId || !activeChannel || (!draft.trim() && !attachment)) return;
+    if (isSending || !projectId || !activeChannel || (!draft.trim() && !attachment)) return;
+    setIsSending(true);
     try {
-      await engflowApi.sendChatMessage(projectId, {
+      const sent = await engflowApi.sendChatMessage(projectId, {
         actorUserId,
         channel: activeChannel,
         message: draft.trim() || attachment?.name || "Anexo enviado",
@@ -74,9 +76,12 @@ export function ProjectChatView({ actorUserId, projectId }: ProjectChatViewProps
       setDraft("");
       setAttachment(null);
       setReplyToId(undefined);
-      await loadMessages();
+      setMessages((current) => uniqueMessages([...current, sent]));
+      setMessage(null);
     } catch (error) {
       setMessage(getApiErrorMessage(error, "Nao foi possivel enviar a mensagem."));
+    } finally {
+      setIsSending(false);
     }
   }
 
@@ -226,7 +231,7 @@ export function ProjectChatView({ actorUserId, projectId }: ProjectChatViewProps
                 <Smile size={18} />
               </button>
               <input className="input-shell min-w-0 flex-1 rounded-xl px-3 py-3 sm:px-4" value={draft} onChange={(event) => setDraft(event.target.value)} placeholder={activeChannel ? "Mensagem" : "Escolha uma conversa"} disabled={!activeChannel} />
-              <button className="btn-primary h-11 w-11 shrink-0 disabled:opacity-50" title="Enviar" disabled={!activeChannel}>
+              <button className="btn-primary h-11 w-11 shrink-0 disabled:opacity-50" title="Enviar" disabled={!activeChannel || isSending}>
                 <Send className="mx-auto" size={18} />
               </button>
             </div>
@@ -257,4 +262,8 @@ function directChannel(firstUserId: string, secondUserId: string) {
   return firstUserId.localeCompare(secondUserId) <= 0
     ? `dm:${firstUserId}:${secondUserId}`
     : `dm:${secondUserId}:${firstUserId}`;
+}
+
+function uniqueMessages(messages: ChatMessage[]) {
+  return [...new Map(messages.map((message) => [message.id, message])).values()];
 }

@@ -1,6 +1,5 @@
 import {
   Bot,
-  Boxes,
   BrainCircuit,
   Calculator,
   ClipboardList,
@@ -9,14 +8,12 @@ import {
   FileSearch,
   FileSignature,
   FileText,
-  Layers3,
-  Ruler,
   Search,
   Send,
   ShieldAlert,
 } from "lucide-react";
 import type { ReactNode } from "react";
-import { useMemo, useState } from "react";
+import { lazy, Suspense, useEffect, useMemo, useState } from "react";
 import { engflowApi } from "../../api/engflowApi";
 import type { Project, ProjectFile } from "../../types";
 import { money } from "../../utils/format";
@@ -54,6 +51,10 @@ const smartSheetRows = [
   ["Concluido", "Executado / total", "Percentual da obra"],
 ];
 
+const ThreeModelViewer = lazy(() =>
+  import("./ThreeModelViewer").then((module) => ({ default: module.ThreeModelViewer })),
+);
+
 export function SmartEngineeringHub({ project, files, canManage }: SmartEngineeringHubProps) {
   const [provider, setProvider] = useState<AiProvider>("openai");
   const [prompt, setPrompt] = useState("Gerar resumo semanal da obra");
@@ -61,12 +62,21 @@ export function SmartEngineeringHub({ project, files, canManage }: SmartEngineer
   const [isAsking, setIsAsking] = useState(false);
   const [selectedTemplate, setSelectedTemplate] = useState(budgetTemplates[0]);
   const [search, setSearch] = useState("");
-  const [activeLayers, setActiveLayers] = useState(["Arquitetonico", "Estrutural", "Eletrico", "Hidraulico"]);
+  const modelFiles = useMemo(() => files.filter(isRealtime3dFile), [files]);
+  const [selectedModelId, setSelectedModelId] = useState("");
   const versions = useMemo(() => buildVersions(files), [files]);
   const conflicts = useMemo(() => buildConflicts(files, project.progress), [files, project.progress]);
   const semanticResults = useMemo(() => buildSearchResults(search, files, conflicts), [search, files, conflicts]);
   const selectedTotal = selectedTemplate.material + selectedTemplate.labor;
   const selectedGrandTotal = selectedTotal * (1 + selectedTemplate.tax + selectedTemplate.profit);
+  const selectedModel = modelFiles.find((file) => file.id === selectedModelId) ?? modelFiles[0];
+
+  useEffect(() => {
+    setSelectedModelId((current) => {
+      if (current && modelFiles.some((file) => file.id === current)) return current;
+      return modelFiles[0]?.id ?? "";
+    });
+  }, [modelFiles]);
 
   async function askAi(action?: AiAction) {
     const detected = action ?? detectAction(prompt);
@@ -82,18 +92,12 @@ export function SmartEngineeringHub({ project, files, canManage }: SmartEngineer
         projectProgress: project.progress,
         fileCount: files.length,
       });
-      setAnswer(`${response.answer}${response.fallback ? "\n\nModo fallback ativo: configure a chave no backend para resposta do provedor real." : ""}`);
+      setAnswer(`${response.answer}${response.fallback ? "\n\nAnalise gerada com os dados atuais disponiveis. Tente novamente depois para uma resposta mais completa." : ""}`);
     } catch {
       setAnswer(buildAiResponse(detected, project, files, provider));
     } finally {
       setIsAsking(false);
     }
-  }
-
-  function toggleLayer(layer: string) {
-    setActiveLayers((current) =>
-      current.includes(layer) ? current.filter((item) => item !== layer) : [...current, layer],
-    );
   }
 
   function exportBudget() {
@@ -137,7 +141,7 @@ export function SmartEngineeringHub({ project, files, canManage }: SmartEngineer
             </p>
             <h3 className="text-3xl font-black tracking-tight">Central inteligente da obra</h3>
             <p className="muted mt-2 max-w-3xl">
-              Assistente tecnico, compatibilizacao, versionamento, viewer 3D, relatorios e busca em um fluxo unico.
+              Assistente tecnico, compatibilizacao, versionamento, obra em 3D, relatorios e busca em um fluxo unico.
             </p>
           </div>
           <div className="flex rounded-2xl border border-[var(--border)] bg-[var(--surface-soft)] p-1">
@@ -181,7 +185,7 @@ export function SmartEngineeringHub({ project, files, canManage }: SmartEngineer
             <div className="panel-flat mt-4 rounded-2xl p-4">
               <p className="mb-2 flex items-center gap-2 text-sm font-black">
                 <Bot size={17} />
-                {isAsking ? "Consultando IA..." : `Resposta ${provider === "openai" ? "OpenAI-ready" : "Gemini-ready"}`}
+                {isAsking ? "Consultando IA..." : "Resposta do assistente"}
               </p>
               <p className="muted whitespace-pre-line text-sm leading-6">{answer}</p>
             </div>
@@ -190,40 +194,37 @@ export function SmartEngineeringHub({ project, files, canManage }: SmartEngineer
           <div className="surface-soft rounded-3xl p-4">
             <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
               <div>
-                <h4 className="font-black">Viewer 3D BIM</h4>
-                <p className="muted text-sm">IFC, OBJ, GLTF, DWG e RVT preparados para pipeline Three.js/xeokit/APS.</p>
+                <h4 className="font-black">Obra em 3D</h4>
+                <p className="muted text-sm">Visualizacao do modelo 3D enviado pelo engenheiro na aba Projetos.</p>
               </div>
-              <span className="badge-accent rounded-full px-3 py-1 text-xs font-black">Lazy loading</span>
+              <span className="badge-accent rounded-full px-3 py-1 text-xs font-black">{modelFiles.length} modelo{modelFiles.length === 1 ? "" : "s"}</span>
             </div>
-            <div className="viewer-grid relative min-h-[22rem] overflow-hidden rounded-3xl border border-[var(--border)]">
-              <div className="absolute inset-0 flex items-center justify-center">
-                <div className="bim-model-scene">
-                  {activeLayers.includes("Arquitetonico") && <span className="bim-layer bim-layer-a" />}
-                  {activeLayers.includes("Estrutural") && <span className="bim-layer bim-layer-b" />}
-                  {activeLayers.includes("Eletrico") && <span className="bim-layer bim-layer-c" />}
-                  {activeLayers.includes("Hidraulico") && <span className="bim-layer bim-layer-d" />}
+            {modelFiles.length > 1 && (
+              <label className="mb-3 block">
+                <span className="muted mb-2 block text-sm font-bold">Modelo</span>
+                <select className="input-shell rounded-2xl px-4 py-3 text-sm font-bold" value={selectedModel?.id ?? ""} onChange={(event) => setSelectedModelId(event.target.value)}>
+                  {modelFiles.map((file) => (
+                    <option key={file.id} value={file.id}>{file.name}</option>
+                  ))}
+                </select>
+              </label>
+            )}
+            <div className="viewer-grid min-h-[28rem] overflow-hidden rounded-3xl border border-[var(--border)] bg-[var(--surface)]">
+              {selectedModel ? (
+                <Suspense fallback={<EmptyLine text="Carregando modelo 3D da obra..." />}>
+                  <ThreeModelViewer file={selectedModel} zoom={1} />
+                </Suspense>
+              ) : (
+                <div className="flex min-h-[28rem] items-center justify-center p-5 text-center">
+                  <div>
+                    <p className="font-black">Nenhum modelo 3D enviado nesta obra.</p>
+                    <p className="muted mt-2 max-w-md text-sm leading-6">
+                      Envie um arquivo FBX, OBJ, GLTF ou GLB na aba Projetos para visualizar a obra em 3D aqui.
+                    </p>
+                  </div>
                 </div>
+              )}
               </div>
-              <div className="absolute left-4 top-4 grid gap-2">
-                {["Arquitetonico", "Estrutural", "Eletrico", "Hidraulico"].map((layer) => (
-                  <button
-                    className={`rounded-xl px-3 py-2 text-left text-xs font-black shadow-sm ${activeLayers.includes(layer) ? "bg-[var(--surface)] text-[var(--accent-strong)]" : "bg-black/40 text-white"}`}
-                    key={layer}
-                    onClick={() => toggleLayer(layer)}
-                    type="button"
-                  >
-                    {layer}
-                  </button>
-                ))}
-              </div>
-              <div className="absolute bottom-4 right-4 flex gap-2">
-                {[Layers3, Ruler, Boxes].map((Icon, index) => (
-                  <button className="icon-button flex h-10 w-10 items-center justify-center" key={index} type="button">
-                    <Icon size={17} />
-                  </button>
-                ))}
-              </div>
-            </div>
           </div>
         </div>
       </section>
@@ -412,7 +413,7 @@ function detectAction(prompt: string): AiAction {
 }
 
 function buildAiResponse(action: AiAction, project: Project, files: ProjectFile[], provider: AiProvider) {
-  const header = `${provider === "openai" ? "OpenAI Responses API" : "Gemini generateContent"} preparado para operar via backend seguro.`;
+  const header = `${provider === "openai" ? "Assistente tecnico" : "Assistente tecnico"} preparado para apoiar a rotina da obra.`;
   const context = `Obra ${project.name}, status ${project.status}, progresso ${project.progress}%, arquivos tecnicos ${files.length}.`;
   const responses: Record<AiAction, string> = {
     checklist: "- Conferir locacao e gabarito.\n- Validar formas, ferragens e cobrimento.\n- Registrar fotos antes da concretagem.\n- Aprovar responsavel tecnico e cliente.",
@@ -433,4 +434,12 @@ function downloadText(filename: string, content: string) {
   link.download = filename;
   link.click();
   URL.revokeObjectURL(url);
+}
+
+function isRealtime3dFile(file: ProjectFile) {
+  return /\.(fbx|obj|gltf|glb)$/i.test(file.name) || /\.(fbx|obj|gltf|glb)$/i.test(file.fileUrl);
+}
+
+function EmptyLine({ text }: { text: string }) {
+  return <p className="surface-soft m-4 rounded-2xl p-4 text-sm font-semibold text-[var(--muted)]">{text}</p>;
 }

@@ -1,4 +1,4 @@
-import { CalendarDays, CloudSun, Download, ImagePlus, Printer, UploadCloud, Users, Video } from "lucide-react";
+import { CloudSun, ImagePlus, Printer, Trash2, UploadCloud, Users, Video } from "lucide-react";
 import { ChangeEvent, FormEvent, useEffect, useMemo, useState } from "react";
 import { engflowApi, getApiErrorMessage } from "../../api/engflowApi";
 import { Field, Stat } from "../../components";
@@ -31,6 +31,7 @@ export function DailyLogsView({ actorUserId, projectId, canCreate }: DailyLogsVi
     videoUrl: "",
     observations: "",
   });
+  const selectedMedia = form.videoUrl || form.photoUrl;
 
   const visibleLogs = useMemo(() => {
     const now = new Date();
@@ -65,6 +66,10 @@ export function DailyLogsView({ actorUserId, projectId, canCreate }: DailyLogsVi
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!projectId) return;
+    if (!form.servicesExecuted.trim()) {
+      setMessage("Informe os servicos executados antes de salvar o diario.");
+      return;
+    }
     try {
       await engflowApi.createDailyLog(projectId, {
         actorUserId,
@@ -96,6 +101,10 @@ export function DailyLogsView({ actorUserId, projectId, canCreate }: DailyLogsVi
       return;
     }
     setForm({ ...form, photoUrl: dataUrl });
+  }
+
+  function removeSelectedMedia() {
+    setForm({ ...form, photoUrl: "", videoUrl: "" });
   }
 
   function handlePrint() {
@@ -172,6 +181,23 @@ export function DailyLogsView({ actorUserId, projectId, canCreate }: DailyLogsVi
               </span>
               <input className="sr-only" type="file" accept="image/*,video/*" onChange={handleMediaSelect} />
             </label>
+            {selectedMedia && (
+              <div className="overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--surface)]">
+                {form.videoUrl ? (
+                  <video className="max-h-56 w-full bg-black object-contain" src={form.videoUrl} controls />
+                ) : (
+                  <img className="max-h-56 w-full object-cover" src={form.photoUrl} alt="Midia selecionada" />
+                )}
+                <button
+                  className="flex w-full items-center justify-center gap-2 px-3 py-3 text-sm font-black text-rose-600"
+                  type="button"
+                  onClick={removeSelectedMedia}
+                >
+                  <Trash2 size={16} />
+                  Remover midia selecionada
+                </button>
+              </div>
+            )}
             <button className="btn-primary px-4 py-3 font-bold">Salvar diario</button>
           </form>
         )}

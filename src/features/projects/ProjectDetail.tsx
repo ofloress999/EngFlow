@@ -403,7 +403,7 @@ export function ProjectDetail({
       )}
 
       {activeTab === "insumos" && (
-        <SuppliesView actorUserId={actorUserId} projectId={project.id} canCreate={isWorker} />
+        <SuppliesView actorUserId={actorUserId} projectId={project.id} canCreate={isWorker} canApprove={isClient} />
       )}
 
       {activeTab === "mapa" && (

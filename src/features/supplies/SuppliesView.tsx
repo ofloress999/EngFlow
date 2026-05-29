@@ -1,4 +1,4 @@
-import { AlertTriangle, Download, PackageMinus, TrendingDown } from "lucide-react";
+import { AlertTriangle, CheckCircle2, Download, PackageMinus, TrendingDown, XCircle } from "lucide-react";
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import { engflowApi, getApiErrorMessage } from "../../api/engflowApi";
 import { Field } from "../../components";
@@ -8,9 +8,10 @@ type SuppliesViewProps = {
   actorUserId: string;
   projectId?: string;
   canCreate?: boolean;
+  canApprove?: boolean;
 };
 
-export function SuppliesView({ actorUserId, projectId, canCreate = true }: SuppliesViewProps) {
+export function SuppliesView({ actorUserId, projectId, canCreate = true, canApprove = false }: SuppliesViewProps) {
   const [supplies, setSupplies] = useState<SupplyRequest[]>([]);
   const [form, setForm] = useState({ itemName: "", quantity: "", priority: "Media", observation: "" });
   const [message, setMessage] = useState<string | null>(null);
@@ -50,6 +51,26 @@ export function SuppliesView({ actorUserId, projectId, canCreate = true }: Suppl
       await load();
     } catch (error) {
       setMessage(getApiErrorMessage(error, "Nao foi possivel relatar insumo."));
+    }
+  }
+
+  async function handleApprove(supplyId: string) {
+    try {
+      const updated = await engflowApi.approveSupply(supplyId, actorUserId);
+      setSupplies((current) => current.map((supply) => (supply.id === supplyId ? updated : supply)));
+      setMessage("Pedido de insumo aprovado.");
+    } catch (error) {
+      setMessage(getApiErrorMessage(error, "Nao foi possivel aprovar o pedido."));
+    }
+  }
+
+  async function handleDecline(supplyId: string) {
+    try {
+      const updated = await engflowApi.declineSupply(supplyId, actorUserId);
+      setSupplies((current) => current.map((supply) => (supply.id === supplyId ? updated : supply)));
+      setMessage("Pedido de insumo recusado.");
+    } catch (error) {
+      setMessage(getApiErrorMessage(error, "Nao foi possivel recusar o pedido."));
     }
   }
 
@@ -142,6 +163,26 @@ export function SuppliesView({ actorUserId, projectId, canCreate = true }: Suppl
               <span className="badge rounded-full px-3 py-1 text-xs font-black">{supply.status}</span>
             </div>
             {supply.observation && <p className="muted mt-3 text-sm">{supply.observation}</p>}
+            {canApprove && supply.status === "PENDENTE_CLIENTE" && (
+              <div className="mt-4 flex flex-wrap gap-2">
+                <button
+                  className="btn-primary flex items-center gap-2 px-3 py-2 text-sm font-bold"
+                  type="button"
+                  onClick={() => void handleApprove(supply.id)}
+                >
+                  <CheckCircle2 size={16} />
+                  Aceitar pedido
+                </button>
+                <button
+                  className="btn-secondary flex items-center gap-2 px-3 py-2 text-sm font-bold text-rose-600"
+                  type="button"
+                  onClick={() => void handleDecline(supply.id)}
+                >
+                  <XCircle size={16} />
+                  Negar pedido
+                </button>
+              </div>
+            )}
           </article>
         ))}
         {supplies.length === 0 && <EmptyLine text="Nenhum insumo relatado." />}

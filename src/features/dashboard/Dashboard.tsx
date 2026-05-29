@@ -52,6 +52,7 @@ type DashboardProps = {
   onDeclineInvitation: (notification: AppNotification) => void;
   onOpenNotification: (notification: AppNotification) => void;
   onMarkNotificationRead: (notification: AppNotification) => Promise<void>;
+  onClearNotifications: () => Promise<void>;
   onUserUpdate: (user: User) => void;
   onToast: (tone: "success" | "error" | "info", title: string, message?: string) => void;
   onLogout: () => void;
@@ -90,6 +91,7 @@ export function Dashboard({
   onDeclineInvitation,
   onOpenNotification,
   onMarkNotificationRead,
+  onClearNotifications,
   onUserUpdate,
   onToast,
   onLogout,
@@ -250,6 +252,7 @@ export function Dashboard({
                 onRefresh={onRefreshNotifications}
                 onOpenNotification={onOpenNotification}
                 onMarkRead={onMarkNotificationRead}
+                onClear={onClearNotifications}
               />
               <button className="icon-button flex h-11 w-11 items-center justify-center" onClick={onToggleTheme}>
                 {theme === "dark" ? <Sun size={18} /> : <Moon size={18} />}
@@ -352,8 +355,8 @@ export function Dashboard({
                 selectedProjectId={selectedProject?.id}
               />
             )}
-            {view === "insumos" && (isWorker || user.role === "admin") && (
-              <SuppliesView actorUserId={user.id} projectId={selectedProject?.id} />
+            {view === "insumos" && (isWorker || isClient || user.role === "admin") && (
+              <SuppliesView actorUserId={user.id} projectId={selectedProject?.id} canCreate={isWorker} canApprove={isClient} />
             )}
             {view === "atualizacoes" && (
               <UpdatesView
@@ -406,6 +409,7 @@ function buildMenu(role: User["role"]): MenuItem[] {
       { id: "relatorio", label: "Relatorio IA", icon: Files },
       { id: "projetos", label: "Projetos", icon: FolderKanban },
       { id: "chamados", label: "Chamados", icon: MessageSquare },
+      { id: "insumos", label: "Pedidos de Insumos", icon: PackageMinus },
     ]);
   }
 
